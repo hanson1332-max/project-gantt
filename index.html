@@ -1,0 +1,3373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>项目管理甘特图</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --surface-soft: #f8f9fb;
+      --line: #dde2e8;
+      --line-strong: #cbd2da;
+      --text: #20252b;
+      --muted: #69727d;
+      --brand: #9d0b22;
+      --brand-soft: #f9e7ea;
+      --blue: #f2b705;
+      --blue-soft: #fff6cf;
+      --regular: #9ccbe5;
+      --non-working-day: #f1f2f4;
+      --selected: #fff6dc;
+      --row-height: 48px;
+      --day-width: 34px;
+      --event-width: 350px;
+      --info-width: 230px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 960px;
+      min-height: 100vh;
+      background: var(--bg);
+    }
+
+    button, input, select { font: inherit; }
+
+    button {
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease;
+    }
+
+    button:hover { border-color: #9ea8b2; background: #fafafa; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid rgba(36, 86, 126, .18);
+      outline-offset: 1px;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 18px 24px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 21px;
+      letter-spacing: .01em;
+    }
+
+    .title-block p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .save-state {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .save-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2c8a57;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar-group { display: flex; align-items: center; gap: 8px; }
+
+    .toolbar button {
+      height: 32px;
+      padding: 0 11px;
+      font-size: 13px;
+    }
+
+    .toolbar .primary {
+      border-color: var(--brand);
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .toolbar .primary:hover { background: #86091d; }
+
+    .zoom-controls { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
+    .zoom-controls button { min-width: 32px; padding: 0 8px; }
+    .zoom-label { min-width: 48px; color: var(--muted); font-size: 10px; text-align: center; }
+
+    .toolbar .secondary-accent {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .people-view-dropdown { position: relative; }
+    .people-view-menu {
+      position: absolute;
+      top: calc(100% + 7px);
+      left: 0;
+      z-index: 35;
+      width: 230px;
+      max-height: 420px;
+      overflow: auto;
+      padding: 7px;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      background: var(--surface);
+      box-shadow: 0 12px 30px rgba(20, 28, 35, .18);
+    }
+    .people-view-menu[hidden] { display: none; }
+    .people-view-menu-title { padding: 6px 8px; color: var(--muted); font-size: 10px; font-weight: 700; }
+    .people-view-option {
+      min-width: 0;
+      flex: 1;
+      height: auto !important;
+      min-height: 38px;
+      padding: 7px 8px !important;
+      text-align: left;
+      border-color: transparent;
+    }
+    .people-view-option:hover, .people-view-option.active { background: var(--brand-soft); }
+    .people-view-option strong { display: block; font-size: 12px; }
+    .people-view-option small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .people-view-row { display: flex; align-items: stretch; gap: 4px; }
+    .people-view-edit { flex: 0 0 34px; width: 34px; height: auto !important; padding: 0 !important; color: var(--muted); }
+    .people-view-menu-divider { height: 1px; margin: 6px 2px; background: var(--line); }
+    .people-view-menu-action { width: 100%; margin-top: 3px; text-align: left; border-color: transparent; }
+
+    .toolbar-note {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .workspace {
+      height: calc(100vh - 159px);
+      min-height: 480px;
+      padding: 16px 24px 20px;
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .gantt-frame {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      overflow: auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: 0 2px 8px rgba(27, 35, 43, .05);
+    }
+
+    .people-sidebar {
+      flex: 0 0 220px;
+      width: 220px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: var(--surface);
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(27, 35, 43, .05);
+    }
+    .people-sidebar-header { padding: 13px 14px 10px; border-bottom: 1px solid var(--line); }
+    .people-sidebar-header h2 { margin: 0; font-size: 14px; }
+    .people-sidebar-header p { margin: 4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .people-sidebar-list { flex: 1; min-height: 0; overflow: auto; padding: 7px; }
+    .people-group { margin-bottom: 10px; border: 1px solid transparent; border-radius: 8px; }
+    .people-group.drop-target { border-color: var(--brand); background: var(--brand-soft); }
+    .people-group-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 4px; color: #4b5661; font-size: 10px; font-weight: 750; }
+    .people-group-count { color: var(--muted); font-weight: 500; }
+    .people-group-empty { padding: 8px; color: var(--muted); font-size: 9px; text-align: center; }
+    .people-sidebar-row { display: flex; align-items: stretch; gap: 4px; margin-bottom: 4px; }
+    .people-sidebar-row.dragging-person { opacity: .4; }
+    .people-sidebar-row.person-drop-before { box-shadow: inset 0 2px 0 var(--brand); }
+    .people-sidebar-row.person-drop-after { box-shadow: inset 0 -2px 0 var(--brand); }
+    .people-drag-handle { flex: 0 0 22px; width: 22px; padding: 0; border: 0; background: transparent; color: #a2aab3; cursor: grab; }
+    .people-drag-handle:hover { color: var(--brand); background: transparent; }
+    .people-sidebar-select {
+      min-width: 0;
+      flex: 1;
+      height: auto;
+      min-height: 42px;
+      padding: 7px 9px;
+      text-align: left;
+      border-color: transparent;
+      background: transparent;
+    }
+    .people-sidebar-select:hover { background: var(--surface-soft); }
+    .people-sidebar-select.active { border-color: #d9a5ad; background: var(--brand-soft); }
+    .people-sidebar-select strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .people-sidebar-select small { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+    .people-sidebar-edit { flex: 0 0 31px; width: 31px; height: auto; padding: 0; color: var(--muted); }
+    .people-sidebar-footer { display: grid; gap: 6px; padding: 9px; border-top: 1px solid var(--line); background: var(--surface-soft); }
+    .people-sidebar-footer button { height: 32px; padding: 0 9px; font-size: 11px; }
+
+    .gantt-content { min-width: max-content; }
+
+    .gantt-header,
+    .gantt-row {
+      display: grid;
+      grid-template-columns: var(--event-width) var(--info-width) auto;
+    }
+
+    .gantt-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 70px;
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--surface);
+    }
+
+    .header-cell {
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      font-size: 12px;
+      font-weight: 650;
+      color: #44505c;
+      background: var(--surface-soft);
+      border-right: 1px solid var(--line-strong);
+    }
+    .header-event { position: sticky; }
+    .column-resizer {
+      position: absolute;
+      top: 0;
+      right: -5px;
+      z-index: 30;
+      width: 10px;
+      height: 100%;
+      cursor: col-resize;
+      touch-action: none;
+    }
+    .column-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; }
+    .column-resizer:hover::after, .column-resizer.resizing::after { background: var(--brand); }
+
+    .header-event { position: sticky; left: 0; z-index: 24; }
+    .header-info { position: sticky; left: var(--event-width); z-index: 24; }
+
+    .timeline-header {
+      position: relative;
+      height: 70px;
+      background: var(--surface);
+    }
+
+    .month-row {
+      position: relative;
+      height: 29px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-soft);
+    }
+
+    .month-segment {
+      position: absolute;
+      top: 0;
+      height: 29px;
+      display: flex;
+      align-items: center;
+      padding-left: 9px;
+      border-right: 1px solid var(--line-strong);
+      color: #44505c;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .day-row { display: flex; height: 41px; }
+
+    .day-cell {
+      flex: 0 0 var(--day-width);
+      width: var(--day-width);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      border-right: 1px solid var(--line);
+      color: #4f5963;
+      font-size: 11px;
+      line-height: 1.1;
+    }
+
+    .day-cell small { color: #929aa3; font-size: 9px; }
+    .day-cell.non-working-day { background: var(--non-working-day); color: #8a929b; }
+    .day-cell.today { box-shadow: inset 0 -3px 0 var(--brand); }
+    .day-cell { position: relative; }
+    .milestone-flag {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 0;
+      height: 0;
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      filter: drop-shadow(0 1px 1px rgba(31, 45, 61, .28));
+    }
+    .milestone-flag.external { border-left: 10px solid var(--brand); }
+    .milestone-flag.internal { border-left: 10px solid var(--blue); }
+
+    .gantt-row {
+      height: var(--row-height);
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .gantt-row:hover .sticky-cell { background: #fafbfc; }
+    .gantt-row.selected .sticky-cell { background: var(--selected); }
+
+    .sticky-cell {
+      position: sticky;
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border-right: 1px solid var(--line-strong);
+      z-index: 8;
+    }
+
+    .event-cell { left: 0; padding: 0 12px; }
+    .info-cell { left: var(--event-width); padding: 6px 12px; }
+
+    .event-content {
+      min-width: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .indent { flex: 0 0 auto; }
+
+    .drag-handle {
+      flex: 0 0 18px;
+      width: 18px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #a2aab3;
+      font-size: 16px;
+      line-height: 1;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .drag-handle:hover { color: var(--brand); background: transparent; }
+    .drag-handle:active { cursor: grabbing; }
+    .gantt-row.dragging { opacity: .42; }
+    .gantt-row.drop-before { box-shadow: inset 0 3px 0 var(--brand); }
+    .gantt-row.drop-after { box-shadow: inset 0 -3px 0 var(--brand); }
+    .gantt-row.drop-inside .sticky-cell { background: var(--brand-soft); }
+    .gantt-row.drop-inside .event-cell { box-shadow: inset 4px 0 0 var(--brand); }
+    .gantt-row.person-dimmed .bar { opacity: .13; filter: grayscale(.75); }
+    .gantt-row.kind-dimmed .bar { opacity: .1; filter: grayscale(.8); }
+    .gantt-row.kind-filter-match .sticky-cell { background: #f8fbfd; }
+    .gantt-row.person-participant .bar {
+      box-shadow: 0 0 0 3px #f2b705, 0 2px 7px rgba(30, 36, 42, .28);
+      z-index: 5;
+    }
+    .gantt-row.person-participant .sticky-cell { background: #fff9e8; }
+    .gantt-row.person-ancestor .sticky-cell { background: #fffbea; }
+    .gantt-row.person-ancestor .event-cell { box-shadow: inset 4px 0 0 #f2b705; }
+    .person-involvement-overlay {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      z-index: 6;
+      min-width: 7px;
+      border: 2px solid #ff8a00;
+      border-radius: 3px;
+      background: rgba(255, 214, 64, .72);
+      box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 1px 5px rgba(120, 72, 0, .32);
+      pointer-events: auto;
+    }
+    .person-date-column-highlight {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      z-index: 2;
+      border-left: 2px solid #ef3e3e;
+      border-right: 2px solid #ef3e3e;
+      background: rgba(255, 67, 67, .055);
+      pointer-events: none;
+    }
+    .day-cell.person-involved-date {
+      z-index: 2;
+      border: 2px solid #ef3e3e;
+      border-bottom-width: 3px;
+      background: #fff1f1;
+      color: #a50e21;
+      font-weight: 750;
+    }
+
+    .floating-load-panel {
+      position: fixed;
+      top: 150px;
+      right: 28px;
+      z-index: 70;
+      width: 390px;
+      max-width: calc(100vw - 24px);
+      max-height: calc(100vh - 180px);
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: 0 14px 38px rgba(25, 31, 38, .24);
+    }
+    .floating-load-panel[hidden] { display: none; }
+    .floating-load-header { display: flex; align-items: center; justify-content: space-between; padding: 11px 13px; border-bottom: 1px solid var(--line); background: var(--surface-soft); cursor: move; user-select: none; }
+    .floating-load-header strong { font-size: 13px; }
+    .floating-load-close { width: 28px; height: 28px; padding: 0; font-size: 18px; }
+    .floating-load-body { max-height: calc(100vh - 235px); overflow: auto; padding: 13px; }
+
+    .collapse-button,
+    .collapse-spacer {
+      flex: 0 0 23px;
+      width: 23px;
+      height: 23px;
+    }
+
+    .collapse-button {
+      border: 0;
+      background: transparent;
+      color: #5f6974;
+      padding: 0;
+      font-size: 15px;
+    }
+
+    .collapse-button:hover { background: #edf0f3; }
+
+    .event-name-wrap { min-width: 0; flex: 1; }
+
+    .event-name {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 560;
+    }
+
+    .level-0 .event-name { font-size: 14px; font-weight: 720; }
+    .level-1 .event-name { font-weight: 650; }
+
+    .event-subline {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .add-child-inline {
+      flex: 0 0 23px;
+      width: 23px;
+      height: 23px;
+      padding: 0;
+      border-color: #b8c1ca;
+      border-radius: 50%;
+      color: #596674;
+      background: #fff;
+      font-size: 17px;
+      line-height: 19px;
+      opacity: .68;
+    }
+
+    .gantt-row:hover .add-child-inline,
+    .add-child-inline:focus-visible {
+      border-color: var(--brand);
+      color: var(--brand);
+      background: var(--brand-soft);
+      opacity: 1;
+    }
+
+    .lock-mark {
+      flex: 0 0 auto;
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .info-stack { min-width: 0; width: 100%; }
+
+    .date-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: #3f4851;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .person-line {
+      margin-top: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .timeline-cell {
+      position: relative;
+      height: var(--row-height);
+      background-color: var(--surface);
+      background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(var(--day-width) - 1px),
+        var(--line) calc(var(--day-width) - 1px),
+        var(--line) var(--day-width)
+      );
+    }
+
+    .non-working-day-band {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: rgba(230, 233, 236, .6);
+      pointer-events: none;
+    }
+
+    .today-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(157, 11, 34, .42);
+      pointer-events: none;
+    }
+
+    .bar {
+      position: absolute;
+      top: 14px;
+      height: 20px;
+      min-width: 18px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      padding: 0 7px;
+      overflow: hidden;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 650;
+      white-space: nowrap;
+      box-shadow: 0 1px 2px rgba(25, 31, 38, .15);
+      z-index: 3;
+    }
+    .bar.draggable-bar { cursor: grab; touch-action: none; }
+    .bar.draggable-bar:active { cursor: grabbing; }
+    .bar-date-handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      z-index: 2;
+      width: 10px;
+      cursor: ew-resize;
+      touch-action: none;
+    }
+    .bar-date-handle.start { left: 0; }
+    .bar-date-handle.end { right: 0; }
+    .bar-date-handle::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 2px; border-radius: 2px; background: rgba(255,255,255,.72); opacity: 0; }
+    .bar-date-handle.start::after { left: 3px; }
+    .bar-date-handle.end::after { right: 3px; }
+    .bar:hover .bar-date-handle::after { opacity: 1; }
+    body.dragging-schedule, body.resizing-column { user-select: none; }
+
+    .bar.regular { background: var(--regular); }
+    .bar.external { background: var(--brand); }
+    .bar.internal { background: var(--blue); }
+    .bar.regular, .bar.internal { color: #24313b; }
+
+    .bar.parent {
+      top: 17px;
+      height: 14px;
+      border-radius: 3px;
+      opacity: .88;
+      padding: 0 5px;
+    }
+
+    .ancestor-important-overlay {
+      position: absolute;
+      z-index: 4;
+      top: 0;
+      bottom: 0;
+      min-width: 5px;
+      border-radius: 2px;
+      pointer-events: auto;
+    }
+    .ancestor-important-overlay.external { background: var(--brand); }
+    .ancestor-important-overlay.internal { background: var(--blue); }
+    .bar.level-0 .ancestor-important-overlay { min-width: 4px; }
+
+    .bar.level-0 { height: 10px; top: 19px; border-radius: 2px; }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    button.legend-item {
+      height: 28px;
+      padding: 0 7px;
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    button.legend-item:hover { background: var(--surface-soft); }
+    button.legend-item.active { border-color: #d9a5ad; background: var(--brand-soft); color: var(--text); }
+    .legend-swatch { width: 14px; height: 8px; border-radius: 3px; }
+    .legend-swatch.external { background: var(--brand); }
+    .legend-swatch.internal { background: var(--blue); }
+    .legend-swatch.regular { background: var(--regular); }
+    .legend-swatch.non-working-day {
+      background: var(--non-working-day);
+      border: 1px solid var(--line-strong);
+    }
+
+    .empty-state {
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(27, 33, 39, .26);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .18s ease, visibility .18s ease;
+    }
+
+    .drawer-backdrop.open { opacity: 1; visibility: visible; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 50;
+      width: 430px;
+      max-width: 92vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      box-shadow: -10px 0 30px rgba(20, 28, 35, .18);
+      transform: translateX(102%);
+      transition: transform .2s ease;
+    }
+
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .drawer-header h2 { margin: 0; font-size: 18px; }
+    .drawer-header p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+
+    .icon-button {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .drawer-body { flex: 1; overflow: auto; padding: 18px 22px 24px; }
+
+    .form-section { margin-bottom: 22px; }
+
+    .form-section-title {
+      margin: 0 0 11px;
+      color: #4b5661;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .04em;
+    }
+
+    .field { margin-bottom: 13px; }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      color: #4b5661;
+      font-size: 12px;
+      font-weight: 620;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 0 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .field input, .field select { height: 37px; }
+    .field textarea { min-height: 92px; padding-top: 9px; padding-bottom: 9px; resize: vertical; line-height: 1.5; }
+
+    .field input:disabled {
+      background: #f2f4f6;
+      color: #767f88;
+    }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .field-help {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .date-warning {
+      display: none;
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: #fff4dc;
+      color: #735216;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .checkbox-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      font-size: 12px;
+    }
+
+    .checkbox-line input { width: 15px; height: 15px; }
+
+    .assignment-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 88px;
+      align-items: center;
+      gap: 10px;
+      min-height: 39px;
+      border-bottom: 1px solid #edf0f2;
+    }
+
+    .assignment-row:last-child { border-bottom: 0; }
+
+    .report-target-list { display: grid; gap: 6px; }
+    .report-target-row { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
+    .report-target-row input { width: 15px; height: 15px; }
+    .stakeholder-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 8px; min-height: 42px; padding: 4px 7px; border-bottom: 1px solid var(--line); }
+    .stakeholder-row:last-child { border-bottom: 0; }
+    .stakeholder-person { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; }
+    .stakeholder-person input { flex: 0 0 auto; width: 15px; height: 15px; }
+
+    .assignment-person {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      font-size: 12px;
+    }
+
+    .assignment-person input { width: 15px; height: 15px; }
+
+    .load-input-wrap { position: relative; }
+
+    .load-input-wrap input {
+      width: 88px;
+      height: 31px;
+      padding: 0 24px 0 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      text-align: right;
+    }
+
+    .load-input-wrap span {
+      position: absolute;
+      right: 8px;
+      top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    .load-input-wrap.disabled { opacity: .42; }
+    .load-readonly {
+      min-width: 74px;
+      padding: 7px 9px;
+      border-radius: 6px;
+      background: #f2f4f6;
+      color: #69727d;
+      font-size: 11px;
+      text-align: right;
+    }
+
+    .daily-load-board { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .daily-load-toolbar { display: flex; align-items: end; gap: 10px; margin-bottom: 12px; }
+    .daily-load-toolbar .field { margin: 0; flex: 0 0 170px; }
+    .daily-load-toolbar input { height: 34px; }
+    .load-stack {
+      display: flex;
+      width: 100%;
+      height: 28px;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: #eef1f4;
+    }
+    .load-stack-segment { min-width: 2px; height: 100%; border-right: 1px solid rgba(255,255,255,.65); }
+    .load-stack-segment:nth-child(5n+1) { background: #2878a8; }
+    .load-stack-segment:nth-child(5n+2) { background: #55a868; }
+    .load-stack-segment:nth-child(5n+3) { background: #e39c37; }
+    .load-stack-segment:nth-child(5n+4) { background: #8b6fb0; }
+    .load-stack-segment:nth-child(5n) { background: #cf5c78; }
+    .load-stack-over { background: repeating-linear-gradient(135deg, #b00020 0 4px, #ff6b7f 4px 8px) !important; }
+    .load-stack-summary { margin: 7px 0 10px; color: var(--muted); font-size: 11px; }
+    .load-stack-summary.over { color: var(--brand); font-weight: 700; }
+    .daily-event-row { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid #edf0f2; }
+    .daily-event-name { min-width: 0; font-size: 12px; font-weight: 650; }
+    .daily-event-path { margin-top: 2px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .daily-load-input { width: 92px; height: 32px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 6px; text-align: right; }
+
+    .drawer-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 22px;
+      border-top: 1px solid var(--line);
+      background: var(--surface-soft);
+    }
+
+    .footer-actions { display: flex; gap: 8px; }
+
+    .drawer-footer button { height: 34px; padding: 0 12px; font-size: 12px; }
+
+    .danger { color: var(--brand); border-color: #d9a5ad; }
+    .save-button { color: #fff; border-color: var(--blue); background: var(--blue); }
+    .save-button:hover { background: #1c496e; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 26px;
+      z-index: 80;
+      transform: translate(-50%, 18px);
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #27313a;
+      color: #fff;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .settings-dialog {
+      width: min(540px, calc(100vw - 32px));
+      max-height: min(680px, calc(100vh - 40px));
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      color: var(--text);
+      box-shadow: 0 18px 50px rgba(20, 28, 35, .24);
+    }
+
+    .settings-dialog::backdrop { background: rgba(27, 33, 39, .32); }
+    .dialog-header, .dialog-footer { padding: 16px 20px; }
+    .dialog-header { border-bottom: 1px solid var(--line); }
+    .dialog-header h2 { margin: 0; font-size: 17px; }
+    .dialog-header p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .dialog-body { max-height: 470px; overflow: auto; padding: 16px 20px; }
+    .dialog-footer { display: flex; justify-content: flex-end; border-top: 1px solid var(--line); background: var(--surface-soft); }
+    .dialog-footer button, .inline-form button, .record-action { height: 34px; padding: 0 12px; font-size: 12px; }
+    .inline-form { display: flex; align-items: end; gap: 8px; }
+    .inline-form .field { flex: 1; margin: 0; }
+    .record-list { display: grid; gap: 8px; margin-top: 16px; }
+    .record-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; }
+    .record-main { min-width: 0; }
+    .record-title { font-size: 12px; font-weight: 650; }
+    .record-meta { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .record-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+    .empty-records { padding: 26px 8px; text-align: center; color: var(--muted); font-size: 12px; }
+
+    .people-board-dialog { width: min(1240px, calc(100vw - 32px)); }
+    .people-board-grid {
+      display: grid;
+      grid-template-columns: 240px 370px minmax(360px, 1fr);
+      min-height: 480px;
+    }
+    .people-panel { min-width: 0; padding: 18px; border-right: 1px solid var(--line); }
+    .people-panel:last-child { border-right: 0; }
+    .people-panel h3 { margin: 0 0 12px; color: #4b5661; font-size: 12px; }
+    .people-list { display: grid; gap: 6px; max-height: 405px; overflow: auto; }
+    .person-list-row { display: flex; align-items: stretch; gap: 4px; }
+    .person-select-button {
+      min-width: 0;
+      flex: 1;
+      padding: 9px 10px;
+      text-align: left;
+      border-color: transparent;
+      background: transparent;
+    }
+    .person-select-button:hover { background: var(--surface-soft); }
+    .person-select-button.selected { border-color: #d9a5ad; background: var(--brand-soft); }
+    .person-edit-button { flex: 0 0 34px; width: 34px; padding: 0; color: var(--muted); }
+    .person-select-name { display: block; font-size: 12px; font-weight: 680; }
+    .person-select-category { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .panel-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .panel-actions button { height: 33px; padding: 0 10px; font-size: 12px; }
+    .participation-summary { display: flex; gap: 8px; margin-bottom: 12px; }
+    .summary-chip { padding: 6px 8px; border-radius: 7px; background: var(--surface-soft); color: var(--muted); font-size: 10px; }
+    .participation-list { display: grid; gap: 8px; max-height: 405px; overflow: auto; }
+    .participation-card { padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; }
+    .participation-title { font-size: 12px; font-weight: 680; }
+    .participation-path { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .participation-meta { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 7px; color: #4f5963; font-size: 10px; }
+    .role-badge { color: var(--brand); font-weight: 700; }
+    .person-form-section { margin-bottom: 20px; padding-bottom: 5px; border-bottom: 1px solid #edf0f2; }
+    .person-form-section:last-of-type { border-bottom: 0; }
+    .person-form-heading { margin: 0 0 12px; color: #4b5661; font-size: 11px; font-weight: 750; }
+    .participation-mode-options { display: flex; gap: 8px; margin-bottom: 12px; }
+    .participation-mode-option { flex: 1; display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; font-size: 11px; }
+    .participation-mode-option:has(input:checked) { border-color: #d9a5ad; background: var(--brand-soft); }
+    .highlight-note { color: #8a6200; font-weight: 650; }
+
+    .date-range-button {
+      width: 100%;
+      height: 39px;
+      padding: 0 11px;
+      text-align: left;
+      border-color: var(--line-strong);
+      background: var(--surface);
+    }
+    .date-range-button:disabled { cursor: default; background: #f2f4f6; color: #767f88; }
+    .date-range-inputs { display: none; }
+    .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .calendar-toolbar button { width: 34px; height: 32px; }
+    .calendar-month-title { font-size: 14px; font-weight: 700; }
+    .calendar-status { margin-bottom: 10px; color: var(--muted); font-size: 11px; text-align: center; }
+    .calendar-boundary-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+    .calendar-boundary-actions button { height: 31px; padding: 0 10px; font-size: 11px; }
+    .calendar-weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .calendar-weekdays span { padding: 5px 0; color: var(--muted); font-size: 10px; text-align: center; }
+    .calendar-day { height: 38px; padding: 0; border-color: transparent; font-size: 12px; }
+    .calendar-day.outside { color: #a9b0b7; }
+    .calendar-day.non-working { background: var(--non-working-day); color: #a0a7ae; text-decoration: line-through; cursor: not-allowed; }
+    .calendar-day.in-range { background: #fbecef; border-radius: 3px; }
+    .calendar-day.range-start, .calendar-day.range-end { border-color: var(--brand); background: var(--brand); color: #fff; }
+
+    @media (max-width: 920px) {
+      .people-board-grid { grid-template-columns: 190px 1fr; }
+      .people-board-grid .people-panel:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+    }
+
+    @media (max-height: 720px) {
+      .app-header { padding-top: 12px; padding-bottom: 10px; }
+      .title-block p { display: none; }
+      .workspace { height: calc(100vh - 126px); }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="title-block">
+      <h1>项目管理甘特图</h1>
+    </div>
+    <div class="save-state" aria-live="polite"><span class="save-dot"></span><span id="saveState">已载入</span></div>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="primary" id="addRootButton">＋ 新增一级事件</button>
+      <button class="secondary-accent" id="saveVersionButton">保存版本</button>
+      <button id="historyButton">历史记录</button>
+      <button id="batchClearButton">批量清除</button>
+      <button id="workdaySettingsButton">加班工作日</button>
+      <button id="expandAllButton">全部展开</button>
+      <button id="collapseAllButton">全部折叠</button>
+      <div class="zoom-controls" aria-label="时间轴缩放">
+        <button id="zoomOutButton" title="缩小时间轴">－</button>
+        <span class="zoom-label" id="zoomLabel">标准</span>
+        <button id="zoomInButton" title="放大时间轴">＋</button>
+        <button id="zoomOverviewButton">全览</button>
+        <button id="zoomWeekButton">一周</button>
+      </div>
+    </div>
+    <div class="toolbar-group">
+      <span class="toolbar-note">按 2026 年法定放假调休日历计算工作日；点击任一事件即可编辑</span>
+      <div class="legend" aria-label="甘特图图例">
+        <button class="legend-item legend-filter" data-kind-filter="external"><i class="legend-swatch external"></i>外部重要节点</button>
+        <button class="legend-item legend-filter" data-kind-filter="internal"><i class="legend-swatch internal"></i>内部重要节点</button>
+        <button class="legend-item legend-filter" data-kind-filter="regular"><i class="legend-swatch regular"></i>常规事件</button>
+        <span class="legend-item"><i class="legend-swatch non-working-day"></i>非工作日</span>
+      </div>
+    </div>
+  </div>
+
+  <main class="workspace">
+    <aside class="people-sidebar" aria-label="人员">
+      <div class="people-sidebar-header">
+        <h2>人员</h2>
+        <p>点击姓名高亮参与事件；再次点击取消高亮。</p>
+      </div>
+      <div class="people-sidebar-list" id="peopleSidebarList"></div>
+      <div class="people-sidebar-footer">
+        <button id="sidebarAddPersonButton">＋ 新增人员</button>
+        <button id="sidebarManagePeopleButton">管理人员</button>
+      </div>
+    </aside>
+    <section class="gantt-frame" id="ganttFrame" aria-label="项目事件甘特图">
+      <div class="gantt-content" id="ganttContent"></div>
+    </section>
+  </main>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="editorDrawer" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+    <div class="drawer-header">
+      <div>
+        <h2 id="editorTitle">编辑事件</h2>
+        <p id="editorPath">—</p>
+      </div>
+      <button class="icon-button" id="closeDrawerButton" aria-label="关闭编辑面板">×</button>
+    </div>
+
+    <div class="drawer-body">
+      <section class="form-section">
+        <h3 class="form-section-title">事件</h3>
+        <div class="field">
+          <label for="eventName">事件名称</label>
+          <input id="eventName" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="eventKind">事件类型（根据关键参与人员自动判定）</label>
+          <select id="eventKind" disabled>
+            <option value="regular">常规事件</option>
+            <option value="external">外部重要节点</option>
+            <option value="internal">内部重要节点</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dateRangeButton">排期日期</label>
+          <button class="date-range-button" id="dateRangeButton" type="button">选择开始与结束日期</button>
+          <div class="date-range-inputs">
+            <input id="eventStart" type="date">
+            <input id="eventEnd" type="date">
+          </div>
+        </div>
+        <div class="field-help" id="dateHelp">父事件日期会根据其全部子事件自动汇总。</div>
+        <div class="date-warning" id="dateWarning"></div>
+      </section>
+
+      <section class="form-section" id="leadAssignmentSection">
+        <h3 class="form-section-title">主负责人</h3>
+        <div class="field">
+          <label for="leadPerson">人员（每个事件只能指定一人）</label>
+          <select id="leadPerson"></select>
+        </div>
+      </section>
+
+      <section class="form-section" id="assistantAssignmentSection">
+        <h3 class="form-section-title">参与组员</h3>
+        <div id="assistantList"></div>
+        <div class="field-help">所有层级都可设置主负责人和参与组员，但不在事件中设置投入百分比。每日精力仅在人员看板中按具体日期编辑，且只计算叶事件。</div>
+      </section>
+
+      <section class="form-section">
+        <h3 class="form-section-title">关键参与人员</h3>
+        <div class="report-target-list" id="reportTargetList"></div>
+        <div class="field-help" id="reportTargetHelp">勾选客户企业自动设为外部重要节点；否则，勾选项目领导自动设为内部重要节点；均未勾选则为常规事件。</div>
+      </section>
+    </div>
+
+    <div class="drawer-footer">
+      <button class="danger" id="deleteEventButton">删除事件</button>
+      <div class="footer-actions">
+        <button id="addChildButton">＋ 添加子事件</button>
+        <button class="save-button" id="saveEventButton">保存修改</button>
+      </div>
+    </div>
+  </aside>
+
+  <section class="floating-load-panel" id="floatingLoadPanel" hidden>
+    <div class="floating-load-header" id="floatingLoadHeader">
+      <strong id="floatingLoadTitle">人员精力分配</strong>
+      <button class="floating-load-close" id="floatingLoadCloseButton" aria-label="关闭精力面板">×</button>
+    </div>
+    <div class="floating-load-body">
+      <div class="daily-load-toolbar">
+        <div class="field">
+          <label for="floatingLoadDateInput">选择日期</label>
+          <input id="floatingLoadDateInput" type="date">
+        </div>
+      </div>
+      <div class="load-stack" id="floatingLoadStack"></div>
+      <div class="load-stack-summary" id="floatingLoadSummary"></div>
+      <div id="floatingLoadEventList"></div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <dialog class="settings-dialog" id="workdayDialog">
+    <div class="dialog-header">
+      <h2>设置加班工作日</h2>
+      <p>指定的周六或周日会按工作日计算并允许排期；其他非工作日仍按法定日历排除。</p>
+    </div>
+    <div class="dialog-body">
+      <div class="inline-form">
+        <div class="field">
+          <label for="overtimeDate">选择周六或周日</label>
+          <input id="overtimeDate" type="date">
+        </div>
+        <button class="save-button" id="addOvertimeDateButton">添加</button>
+      </div>
+      <div class="record-list" id="overtimeDateList"></div>
+    </div>
+    <div class="dialog-footer"><button data-close-dialog="workdayDialog">完成</button></div>
+  </dialog>
+
+  <dialog class="settings-dialog" id="historyDialog">
+    <div class="dialog-header">
+      <h2>历史记录</h2>
+      <p>点击“保存版本”生成记录。回滚前系统会自动保留一份当前状态，最多保存 30 条。</p>
+    </div>
+    <div class="dialog-body"><div class="record-list" id="historyList"></div></div>
+    <div class="dialog-footer"><button data-close-dialog="historyDialog">关闭</button></div>
+  </dialog>
+
+  <dialog class="settings-dialog" id="batchClearDialog">
+    <div class="dialog-header">
+      <h2>批量清除</h2>
+      <p>每次清除前都会自动保存历史版本，可以随时从历史记录回滚。</p>
+    </div>
+    <div class="dialog-body">
+      <div class="record-list">
+        <div class="record-row">
+          <div class="record-main">
+            <div class="record-title">清除全部人员关联与精力</div>
+            <div class="record-meta">保留人员名单、事件层级和日期；清除主负责人、参与组员、关键参与人员及所有按日投入。</div>
+          </div>
+          <div class="record-actions"><button class="danger" id="clearPeopleEnergyButton">一键清除</button></div>
+        </div>
+        <div class="record-row">
+          <div class="record-main">
+            <div class="record-title">清除全部事件性质</div>
+            <div class="record-meta">保留事件、人员关联和日期；将外部重要节点、内部重要节点全部恢复为常规事件。</div>
+          </div>
+          <div class="record-actions"><button class="danger" id="clearEventKindsButton">一键清除</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-footer"><button data-close-dialog="batchClearDialog">关闭</button></div>
+  </dialog>
+
+  <dialog class="settings-dialog people-board-dialog" id="peopleBoardDialog">
+    <div class="dialog-header">
+      <h2>人员看板</h2>
+      <p>点击人员可立即在甘特图中高亮其参与事件；点击右侧铅笔可留在看板中编辑人员并查看参与明细。</p>
+    </div>
+    <div class="people-board-grid">
+      <section class="people-panel">
+        <h3>人员</h3>
+        <div class="people-list" id="peopleBoardList"></div>
+        <div class="panel-actions"><button id="addPersonButton">＋ 新增人员</button></div>
+      </section>
+      <section class="people-panel">
+        <h3>姓名与属性</h3>
+        <div id="personEditorEmpty" class="empty-records">请选择一名人员</div>
+        <div id="personEditorFields" hidden>
+          <section class="person-form-section">
+            <h4 class="person-form-heading">基本信息</h4>
+            <div class="field">
+              <label for="personNameInput">姓名或角色名称</label>
+              <input id="personNameInput" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="personCategoryInput">人员属性</label>
+              <select id="personCategoryInput">
+                <option value="projectMember">项目组员</option>
+                <option value="projectLeader">项目领导</option>
+                <option value="clientExecutive">客户企业</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="personRoleInput">具体角色</label>
+              <input id="personRoleInput" autocomplete="off" placeholder="例如：行业总、公司 CEO、项目总监、项目经理">
+            </div>
+            <div class="field">
+              <label for="personCapacityInput">每日投入上限</label>
+              <div class="load-input-wrap">
+                <input id="personCapacityInput" type="number" min="0" max="100" step="5" value="100">
+                <span>%</span>
+              </div>
+            </div>
+          </section>
+          <section class="person-form-section">
+            <h4 class="person-form-heading">参与安排</h4>
+            <div class="participation-mode-options">
+              <label class="participation-mode-option"><input type="radio" name="personParticipationMode" value="full" checked> 全程参与</label>
+              <label class="participation-mode-option"><input type="radio" name="personParticipationMode" value="custom"> 指定参与日期</label>
+            </div>
+            <div class="field" id="personDateRangeField" hidden>
+              <label for="personDateRangeButton">参与日期</label>
+              <button class="date-range-button" id="personDateRangeButton" type="button">选择参与开始与结束日期</button>
+              <div class="date-range-inputs">
+                <input id="personAvailableFromInput" type="date">
+                <input id="personAvailableToInput" type="date">
+              </div>
+            </div>
+            <div class="field">
+              <label for="personNotesInput">备注</label>
+              <textarea id="personNotesInput" placeholder="例如：9月13日后转入其他项目；每周五下午不可排期"></textarea>
+            </div>
+          </section>
+          <div class="field-help">“客户企业”可代表咨询项目的客户方组织，也可以按需要新增具体客户人员。</div>
+          <div class="panel-actions">
+            <button class="save-button" id="savePersonButton">保存人员</button>
+            <button class="danger" id="deletePersonButton">删除</button>
+          </div>
+        </div>
+      </section>
+      <section class="people-panel">
+        <h3 id="participationHeading">参与事件</h3>
+        <div class="participation-summary" id="participationSummary"></div>
+        <section class="daily-load-board" id="dailyLoadBoard" hidden>
+          <div class="daily-load-toolbar">
+            <div class="field">
+              <label for="dailyLoadDateInput">查看具体日期</label>
+              <input id="dailyLoadDateInput" type="date">
+            </div>
+          </div>
+          <div class="load-stack" id="dailyLoadStack"></div>
+          <div class="load-stack-summary" id="dailyLoadSummary"></div>
+          <div id="dailyLoadEventList"></div>
+        </section>
+        <div class="participation-list" id="participationList"></div>
+      </section>
+    </div>
+    <div class="dialog-footer"><button data-close-dialog="peopleBoardDialog">关闭</button></div>
+  </dialog>
+
+  <dialog class="settings-dialog" id="dateRangeDialog">
+    <div class="dialog-header">
+      <h2>选择排期日期</h2>
+      <p>连续点击两次：第一次选择开始日期，第二次选择结束日期。非工作日默认不可选。</p>
+    </div>
+    <div class="dialog-body">
+      <div class="calendar-toolbar">
+        <button id="previousMonthButton" aria-label="上个月">‹</button>
+        <span class="calendar-month-title" id="calendarMonthTitle"></span>
+        <button id="nextMonthButton" aria-label="下个月">›</button>
+      </div>
+      <div class="calendar-status" id="calendarStatus"></div>
+      <div class="calendar-boundary-actions" id="calendarBoundaryActions" hidden>
+        <button id="useProjectStartButton">从项目开始</button>
+        <button id="useProjectEndButton" hidden>到项目结束</button>
+      </div>
+      <div class="calendar-weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+    <div class="dialog-footer"><button data-close-dialog="dateRangeDialog">取消</button></div>
+  </dialog>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'project-gantt-mvp-v0.1-minimal';
+      const HISTORY_KEY = 'project-gantt-mvp-v0.1-history';
+      let DAY_WIDTH = 34;
+      const ZOOM_MODES = ['overview', 'compact', 'normal', 'detail', 'week'];
+      const TODAY = '2026-08-13';
+      // 国办发明电〔2025〕7号：2026 年法定节假日与调休上班日。
+      const HOLIDAY_NAMES = new Map([
+        ['2026-01-01', '元旦'], ['2026-01-02', '元旦'], ['2026-01-03', '元旦'],
+        ['2026-02-15', '春节'], ['2026-02-16', '春节'], ['2026-02-17', '春节'],
+        ['2026-02-18', '春节'], ['2026-02-19', '春节'], ['2026-02-20', '春节'],
+        ['2026-02-21', '春节'], ['2026-02-22', '春节'], ['2026-02-23', '春节'],
+        ['2026-04-04', '清明节'], ['2026-04-05', '清明节'], ['2026-04-06', '清明节'],
+        ['2026-05-01', '劳动节'], ['2026-05-02', '劳动节'], ['2026-05-03', '劳动节'],
+        ['2026-05-04', '劳动节'], ['2026-05-05', '劳动节'],
+        ['2026-06-19', '端午节'], ['2026-06-20', '端午节'], ['2026-06-21', '端午节'],
+        ['2026-09-25', '中秋节'], ['2026-09-26', '中秋节'], ['2026-09-27', '中秋节'],
+        ['2026-10-01', '国庆节'], ['2026-10-02', '国庆节'], ['2026-10-03', '国庆节'],
+        ['2026-10-04', '国庆节'], ['2026-10-05', '国庆节'], ['2026-10-06', '国庆节'],
+        ['2026-10-07', '国庆节']
+      ]);
+      const ADJUSTED_WORKDAYS = new Set([
+        '2026-01-04', '2026-02-14', '2026-02-28', '2026-05-09', '2026-09-20', '2026-10-10'
+      ]);
+
+      const defaultData = {
+        workdayOverrides: [],
+        people: [
+          { id: 'p-yuhan', name: '于汉', category: 'projectMember' },
+          { id: 'p-wangshan', name: '王珊', category: 'projectMember' },
+          { id: 'p-yanggang', name: '杨刚', category: 'projectMember' },
+          { id: 'p-jianzhong', name: '建中', category: 'projectMember' },
+          { id: 'p-chengou', name: '承瓯', category: 'projectMember' },
+          { id: 'p-new-a', name: '新伙伴A', category: 'projectMember' },
+          { id: 'p-new-b', name: '新伙伴B', category: 'projectMember' },
+          { id: 'p-xiaoxuantong', name: '肖玄同', category: 'projectLeader', title: '行业总' },
+          { id: 'p-xieweishan', name: '谢伟山', category: 'projectLeader', title: '公司 CEO' },
+          { id: 'p-qingmei-executives', name: '清美企业', category: 'clientExecutive', title: '' }
+        ],
+        events: [
+          { id: 'a', parentId: null, name: '研究期主线A｜生鲜零售＋农文旅', start: '2026-08-13', end: '2026-10-09', kind: 'regular', locked: false, assignments: [] },
+          { id: 'b', parentId: null, name: '研究期主线B｜鲜食连锁', start: '2026-08-13', end: '2026-10-30', kind: 'regular', locked: false, assignments: [] }
+        ]
+      };
+
+      const ui = {
+        collapsed: new Set(),
+        selectedId: null,
+        draftId: null,
+        draggingId: null,
+        draggingPersonId: null,
+        dropMode: null,
+        selectedPersonId: null,
+        highlightedPersonId: null,
+        kindFilter: null,
+        zoomMode: 'normal',
+        calendarMonth: TODAY.slice(0, 7),
+        rangeSelectionStart: null,
+        rangeTarget: 'event',
+        personStartBoundary: 'date',
+        personEndBoundary: 'date'
+      };
+
+      const savedEventWidth = Number(localStorage.getItem('project-gantt-event-column-width'));
+      if (Number.isFinite(savedEventWidth)) {
+        document.documentElement.style.setProperty('--event-width', `${Math.min(650, Math.max(260, savedEventWidth))}px`);
+      }
+
+      let data = loadData();
+
+      const els = {
+        ganttFrame: document.getElementById('ganttFrame'),
+        ganttContent: document.getElementById('ganttContent'),
+        saveState: document.getElementById('saveState'),
+        addRootButton: document.getElementById('addRootButton'),
+        saveVersionButton: document.getElementById('saveVersionButton'),
+        historyButton: document.getElementById('historyButton'),
+        batchClearButton: document.getElementById('batchClearButton'),
+        workdaySettingsButton: document.getElementById('workdaySettingsButton'),
+        peopleSidebarList: document.getElementById('peopleSidebarList'),
+        sidebarAddPersonButton: document.getElementById('sidebarAddPersonButton'),
+        sidebarManagePeopleButton: document.getElementById('sidebarManagePeopleButton'),
+        expandAllButton: document.getElementById('expandAllButton'),
+        collapseAllButton: document.getElementById('collapseAllButton'),
+        zoomOutButton: document.getElementById('zoomOutButton'),
+        zoomInButton: document.getElementById('zoomInButton'),
+        zoomOverviewButton: document.getElementById('zoomOverviewButton'),
+        zoomWeekButton: document.getElementById('zoomWeekButton'),
+        zoomLabel: document.getElementById('zoomLabel'),
+        drawerBackdrop: document.getElementById('drawerBackdrop'),
+        editorDrawer: document.getElementById('editorDrawer'),
+        closeDrawerButton: document.getElementById('closeDrawerButton'),
+        editorPath: document.getElementById('editorPath'),
+        eventName: document.getElementById('eventName'),
+        eventKind: document.getElementById('eventKind'),
+        eventStart: document.getElementById('eventStart'),
+        eventEnd: document.getElementById('eventEnd'),
+        dateRangeButton: document.getElementById('dateRangeButton'),
+        dateHelp: document.getElementById('dateHelp'),
+        dateWarning: document.getElementById('dateWarning'),
+        leadPerson: document.getElementById('leadPerson'),
+        assistantList: document.getElementById('assistantList'),
+        leadAssignmentSection: document.getElementById('leadAssignmentSection'),
+        assistantAssignmentSection: document.getElementById('assistantAssignmentSection'),
+        reportTargetList: document.getElementById('reportTargetList'),
+        reportTargetHelp: document.getElementById('reportTargetHelp'),
+        deleteEventButton: document.getElementById('deleteEventButton'),
+        addChildButton: document.getElementById('addChildButton'),
+        saveEventButton: document.getElementById('saveEventButton'),
+        workdayDialog: document.getElementById('workdayDialog'),
+        overtimeDate: document.getElementById('overtimeDate'),
+        addOvertimeDateButton: document.getElementById('addOvertimeDateButton'),
+        overtimeDateList: document.getElementById('overtimeDateList'),
+        historyDialog: document.getElementById('historyDialog'),
+        historyList: document.getElementById('historyList'),
+        batchClearDialog: document.getElementById('batchClearDialog'),
+        clearPeopleEnergyButton: document.getElementById('clearPeopleEnergyButton'),
+        clearEventKindsButton: document.getElementById('clearEventKindsButton'),
+        peopleBoardDialog: document.getElementById('peopleBoardDialog'),
+        peopleBoardList: document.getElementById('peopleBoardList'),
+        addPersonButton: document.getElementById('addPersonButton'),
+        personEditorEmpty: document.getElementById('personEditorEmpty'),
+        personEditorFields: document.getElementById('personEditorFields'),
+        personNameInput: document.getElementById('personNameInput'),
+        personCategoryInput: document.getElementById('personCategoryInput'),
+        personRoleInput: document.getElementById('personRoleInput'),
+        personCapacityInput: document.getElementById('personCapacityInput'),
+        personAvailableFromInput: document.getElementById('personAvailableFromInput'),
+        personAvailableToInput: document.getElementById('personAvailableToInput'),
+        personNotesInput: document.getElementById('personNotesInput'),
+        personDateRangeButton: document.getElementById('personDateRangeButton'),
+        personDateRangeField: document.getElementById('personDateRangeField'),
+        savePersonButton: document.getElementById('savePersonButton'),
+        deletePersonButton: document.getElementById('deletePersonButton'),
+        participationHeading: document.getElementById('participationHeading'),
+        participationSummary: document.getElementById('participationSummary'),
+        participationList: document.getElementById('participationList'),
+        dailyLoadBoard: document.getElementById('dailyLoadBoard'),
+        dailyLoadDateInput: document.getElementById('dailyLoadDateInput'),
+        dailyLoadStack: document.getElementById('dailyLoadStack'),
+        dailyLoadSummary: document.getElementById('dailyLoadSummary'),
+        dailyLoadEventList: document.getElementById('dailyLoadEventList'),
+        floatingLoadPanel: document.getElementById('floatingLoadPanel'),
+        floatingLoadHeader: document.getElementById('floatingLoadHeader'),
+        floatingLoadTitle: document.getElementById('floatingLoadTitle'),
+        floatingLoadCloseButton: document.getElementById('floatingLoadCloseButton'),
+        floatingLoadDateInput: document.getElementById('floatingLoadDateInput'),
+        floatingLoadStack: document.getElementById('floatingLoadStack'),
+        floatingLoadSummary: document.getElementById('floatingLoadSummary'),
+        floatingLoadEventList: document.getElementById('floatingLoadEventList'),
+        dateRangeDialog: document.getElementById('dateRangeDialog'),
+        previousMonthButton: document.getElementById('previousMonthButton'),
+        nextMonthButton: document.getElementById('nextMonthButton'),
+        calendarMonthTitle: document.getElementById('calendarMonthTitle'),
+        calendarStatus: document.getElementById('calendarStatus'),
+        calendarGrid: document.getElementById('calendarGrid'),
+        calendarBoundaryActions: document.getElementById('calendarBoundaryActions'),
+        useProjectStartButton: document.getElementById('useProjectStartButton'),
+        useProjectEndButton: document.getElementById('useProjectEndButton'),
+        toast: document.getElementById('toast')
+      };
+
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function normalizeDataShape(value) {
+        if (!Array.isArray(value.workdayOverrides)) value.workdayOverrides = [];
+        value.people.forEach(person => {
+          if (!person.category) person.category = 'projectMember';
+          if (person.category === 'industryLead') {
+            person.category = 'projectLeader';
+            if (!person.title) person.title = '行业总';
+          }
+          if (person.category === 'ceo') {
+            person.category = 'projectLeader';
+            if (!person.title) person.title = '公司 CEO';
+          }
+          if (typeof person.title !== 'string') person.title = '';
+          if (typeof person.availableFrom !== 'string') person.availableFrom = '';
+          if (typeof person.availableTo !== 'string') person.availableTo = '';
+          if (typeof person.notes !== 'string') person.notes = '';
+          person.dailyCapacity = clampLoad(person.dailyCapacity, 100);
+          if (person.participationMode !== 'custom') {
+            person.participationMode = person.availableFrom || person.availableTo ? 'custom' : 'full';
+          }
+          if (person.startBoundary !== 'project') person.startBoundary = 'date';
+          if (person.endBoundary !== 'project') person.endBoundary = 'date';
+          if (person.name === '清美企业高管') person.name = '清美企业';
+        });
+        value.events.forEach(event => {
+          if (!Array.isArray(event.reportTo)) event.reportTo = [];
+          if (!Array.isArray(event.attendeeIds)) event.attendeeIds = [];
+          if (!event.dailyLoads || typeof event.dailyLoads !== 'object' || Array.isArray(event.dailyLoads)) event.dailyLoads = {};
+        });
+        const parentIds = new Set(value.events.map(event => event.parentId).filter(Boolean));
+        value.events.forEach(event => {
+          if (parentIds.has(event.id)) event.dailyLoads = {};
+          (event.assignments || []).forEach(assignment => delete assignment.load);
+        });
+        [
+          { id: 'p-xiaoxuantong', name: '肖玄同', category: 'projectLeader', title: '行业总' },
+          { id: 'p-xieweishan', name: '谢伟山', category: 'projectLeader', title: '公司 CEO' },
+          { id: 'p-qingmei-executives', name: '清美企业', category: 'clientExecutive', title: '' }
+        ].forEach(person => {
+          if (!value.people.some(item => item.id === person.id || item.name === person.name)) value.people.push(person);
+        });
+        return value;
+      }
+
+      function loadData() {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (!saved) return clone(defaultData);
+          const parsed = JSON.parse(saved);
+          if (!Array.isArray(parsed.people) || !Array.isArray(parsed.events)) throw new Error('invalid data');
+          return normalizeDataShape(parsed);
+        } catch (error) {
+          console.warn('本地数据无法读取，已载入初始数据。', error);
+          return clone(defaultData);
+        }
+      }
+
+      function persist() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          workdayOverrides: data.workdayOverrides || [],
+          people: data.people,
+          events: data.events
+        }));
+        if (location.protocol === 'http:' || location.protocol === 'https:') {
+          clearTimeout(persist.sharedTimer);
+          persist.sharedTimer = setTimeout(() => fetch('https://qingmei-project-gantt.hanson1332.chatgpt.site/api/project', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ data })
+          }).then(response => {
+            if (!response.ok) throw new Error('共享保存失败');
+            els.saveState.innerHTML = '已同步';
+          }).catch(() => { els.saveState.innerHTML = '同步失败，请重试'; }), 250);
+        }
+        const now = new Date();
+        els.saveState.textContent = `已保存 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      }
+
+      async function loadSharedProject() {
+        if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+        try {
+          const response = await fetch('https://qingmei-project-gantt.hanson1332.chatgpt.site/api/project');
+          if (!response.ok) return;
+          const payload = await response.json();
+          if (!payload?.data) return;
+          data = normalizeDataShape(payload.data);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          render();
+          renderPeopleSidebar();
+          els.saveState.innerHTML = '共享数据已载入';
+        } catch (error) {
+          console.warn('共享数据暂时无法载入。', error);
+        }
+      }
+
+      function parseDate(dateString) {
+        return new Date(`${dateString}T00:00:00Z`);
+      }
+
+      function toDateString(date) {
+        return date.toISOString().slice(0, 10);
+      }
+
+      function addDays(dateString, amount) {
+        const date = parseDate(dateString);
+        date.setUTCDate(date.getUTCDate() + amount);
+        return toDateString(date);
+      }
+
+      function dayDiff(start, end) {
+        return Math.round((parseDate(end) - parseDate(start)) / 86400000);
+      }
+
+      function enumerateDates(start, end) {
+        const result = [];
+        for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) result.push(cursor);
+        return result;
+      }
+
+      function isWeekend(dateString) {
+        const day = parseDate(dateString).getUTCDay();
+        return day === 0 || day === 6;
+      }
+
+      function isWorkingDay(dateString) {
+        if ((data.workdayOverrides || []).includes(dateString)) return true;
+        if (ADJUSTED_WORKDAYS.has(dateString)) return true;
+        if (HOLIDAY_NAMES.has(dateString)) return false;
+        return !isWeekend(dateString);
+      }
+
+      function workdayCount(start, end) {
+        return enumerateDates(start, end).filter(isWorkingDay).length;
+      }
+
+      function formatDate(dateString) {
+        const date = parseDate(dateString);
+        return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+      }
+
+      function weekdayLabel(dateString) {
+        return ['日', '一', '二', '三', '四', '五', '六'][parseDate(dateString).getUTCDay()];
+      }
+
+      function eventById(id) {
+        return data.events.find(event => event.id === id) || null;
+      }
+
+      function childrenOf(id) {
+        return data.events.filter(event => event.parentId === id);
+      }
+
+      function effectiveRange(event) {
+        const children = childrenOf(event.id);
+        if (!children.length) return { start: event.start, end: event.end };
+        const ranges = children.map(effectiveRange);
+        return {
+          start: ranges.map(range => range.start).sort()[0],
+          end: ranges.map(range => range.end).sort().at(-1)
+        };
+      }
+
+      function eventDepth(event) {
+        let depth = 0;
+        let cursor = event;
+        const seen = new Set([event.id]);
+        while (cursor.parentId) {
+          cursor = eventById(cursor.parentId);
+          if (!cursor || seen.has(cursor.id)) break;
+          seen.add(cursor.id);
+          depth += 1;
+        }
+        return depth;
+      }
+
+      function eventPath(event) {
+        const path = [event.name];
+        let cursor = event;
+        while (cursor.parentId) {
+          cursor = eventById(cursor.parentId);
+          if (!cursor) break;
+          path.unshift(cursor.name);
+        }
+        return path.join('  /  ');
+      }
+
+      function personDirectlyInvolvesEvent(event, personId) {
+        return (event.assignments || []).some(item => item.personId === personId)
+          || (event.reportTo || []).includes(personId)
+          || (event.attendeeIds || []).includes(personId);
+      }
+
+      function personInvolvedDescendants(event, personId) {
+        return descendantIds(event.id).map(eventById).filter(item => item && personDirectlyInvolvesEvent(item, personId));
+      }
+
+      function highlightedPersonDates() {
+        if (!ui.highlightedPersonId) return new Set();
+        const dates = new Set();
+        data.events.filter(event => personDirectlyInvolvesEvent(event, ui.highlightedPersonId)).forEach(event => {
+          const range = effectiveRange(event);
+          enumerateDates(range.start, range.end).forEach(date => dates.add(date));
+        });
+        return dates;
+      }
+
+      function renderPersonDateColumns(dates) {
+        const involvedDates = highlightedPersonDates();
+        return dates.map((date, index) => involvedDates.has(date)
+          ? `<span class="person-date-column-highlight" style="left:${index * DAY_WIDTH}px;width:${DAY_WIDTH}px"></span>`
+          : '').join('');
+      }
+
+      function visibleEvents() {
+        const result = [];
+        const visit = (parentId, depth) => {
+          data.events.filter(event => event.parentId === parentId).forEach(event => {
+            result.push({ event, depth });
+            if (!ui.collapsed.has(event.id)) visit(event.id, depth + 1);
+          });
+        };
+        visit(null, 0);
+        return result;
+      }
+
+      function personName(personId) {
+        return data.people.find(person => person.id === personId)?.name || '未命名';
+      }
+
+      function personCategoryLabel(category) {
+        return {
+          projectMember: '项目组员',
+          projectLeader: '项目领导',
+          clientExecutive: '客户企业',
+          other: '其他'
+        }[category] || '其他';
+      }
+
+      function personDisplayRole(person) {
+        return person.title?.trim() || personCategoryLabel(person.category);
+      }
+
+      function projectMembers() {
+        return data.people.filter(person => person.category === 'projectMember');
+      }
+
+      function eligibleReportTargets(kind) {
+        if (kind === 'external') return data.people.filter(person => person.category === 'clientExecutive');
+        if (kind === 'internal') return data.people.filter(person => person.category === 'projectLeader');
+        return [];
+      }
+
+      function assignmentSummary(event) {
+        const assignments = event.assignments || [];
+        const lead = assignments.find(item => item.role === 'lead');
+        const assistants = assignments.filter(item => item.role === 'assist');
+        const reports = (event.reportTo || []).map(personName);
+        const attendees = (event.attendeeIds || []).map(personName);
+        if (!lead && !assistants.length && !reports.length && !attendees.length) return '暂未安排人员';
+        const parts = [];
+        if (lead) parts.push(`主责：${personName(lead.personId)}`);
+        if (assistants.length) parts.push(`参与：${assistants.map(item => personName(item.personId)).join('、')}`);
+        if (reports.length || attendees.length) parts.push(`关键参与：${[...reports, ...attendees].join('、')}`);
+        return parts.join('　');
+      }
+
+      function chartRange() {
+        if (!data.events.length) return { start: TODAY, end: addDays(TODAY, 30) };
+        const roots = data.events.filter(event => !event.parentId);
+        const ranges = (roots.length ? roots : data.events).map(effectiveRange);
+        return {
+          start: addDays(ranges.map(range => range.start).sort()[0], -2),
+          end: addDays(ranges.map(range => range.end).sort().at(-1), 2)
+        };
+      }
+
+      function projectDateRange() {
+        if (!data.events.length) return { start: TODAY, end: TODAY };
+        const roots = data.events.filter(event => !event.parentId);
+        const ranges = (roots.length ? roots : data.events).map(effectiveRange);
+        return {
+          start: ranges.map(range => range.start).sort()[0],
+          end: ranges.map(range => range.end).sort().at(-1)
+        };
+      }
+
+      function personParticipationRange(person) {
+        const project = projectDateRange();
+        if (!person || person.participationMode !== 'custom') return project;
+        return {
+          start: person.startBoundary === 'project' ? project.start : person.availableFrom || project.start,
+          end: person.endBoundary === 'project' ? project.end : person.availableTo || project.end
+        };
+      }
+
+      function personAvailabilityForRange(person, range) {
+        const available = personParticipationRange(person);
+        if (range.end < available.start || range.start > available.end) return { status: 'unavailable', available };
+        if (range.start < available.start || range.end > available.end) return { status: 'partial', available };
+        return { status: 'available', available };
+      }
+
+      function availabilityLabel(result) {
+        if (result.status === 'unavailable') return `不可用：参与 ${result.available.start}—${result.available.end}`;
+        if (result.status === 'partial') return `部分覆盖：参与 ${result.available.start}—${result.available.end}`;
+        return '';
+      }
+
+      function remainingCapacityForEvent(personId, event, range) {
+        const person = data.people.find(item => item.id === personId);
+        const capacityLimit = person?.dailyCapacity ?? 100;
+        let maximumExistingLoad = 0;
+        enumerateDates(range.start, range.end).filter(isWorkingDay).forEach(date => {
+          let dailyLoad = 0;
+          data.events.forEach(otherEvent => {
+            if (otherEvent.id === event.id) return;
+            const otherRange = effectiveRange(otherEvent);
+            if (date < otherRange.start || date > otherRange.end) return;
+            const assignment = (otherEvent.assignments || []).find(item => item.personId === personId);
+            if (assignment) dailyLoad += assignmentLoadForDate(otherEvent, assignment, date);
+          });
+          maximumExistingLoad = Math.max(maximumExistingLoad, dailyLoad);
+        });
+        return Math.max(0, capacityLimit - maximumExistingLoad);
+      }
+
+      function assignmentLoadForDate(event, assignment, date) {
+        const override = event.dailyLoads?.[date]?.[assignment.personId];
+        return override === undefined ? 0 : Number(override) || 0;
+      }
+
+      function zoomModeLabel(mode) {
+        return { overview: '全周期', compact: '紧凑', normal: '标准', detail: '详细', week: '一周' }[mode] || '标准';
+      }
+
+      function resolveDayWidth(dateCount) {
+        const timelineViewport = Math.max(240, (els.ganttFrame.clientWidth || 920) - 580);
+        if (ui.zoomMode === 'overview') return Math.max(3, Math.min(34, timelineViewport / Math.max(dateCount, 1)));
+        if (ui.zoomMode === 'compact') return 18;
+        if (ui.zoomMode === 'detail') return 54;
+        if (ui.zoomMode === 'week') return Math.max(54, Math.min(120, timelineViewport / 7));
+        return 34;
+      }
+
+      function applyZoomMode(mode) {
+        if (!ZOOM_MODES.includes(mode)) return;
+        const oldWidth = DAY_WIDTH;
+        const oldScrollLeft = els.ganttFrame.scrollLeft;
+        const centerDay = Math.max(0, (oldScrollLeft + els.ganttFrame.clientWidth / 2 - 580) / oldWidth);
+        ui.zoomMode = mode;
+        render();
+        if (mode === 'overview') {
+          els.ganttFrame.scrollLeft = 0;
+        } else {
+          els.ganttFrame.scrollLeft = Math.max(0, 580 + centerDay * DAY_WIDTH - els.ganttFrame.clientWidth / 2);
+        }
+      }
+
+      function stepZoom(amount) {
+        const index = ZOOM_MODES.indexOf(ui.zoomMode);
+        applyZoomMode(ZOOM_MODES[Math.max(0, Math.min(ZOOM_MODES.length - 1, index + amount))]);
+      }
+
+      function render() {
+        updateLegendFilterButtons();
+        if (!data.events.length) {
+          els.ganttContent.innerHTML = '<div class="empty-state">还没有事件。点击“新增一级事件”开始搭建。</div>';
+          return;
+        }
+
+        const range = chartRange();
+        const dates = enumerateDates(range.start, range.end);
+        DAY_WIDTH = resolveDayWidth(dates.length);
+        document.documentElement.style.setProperty('--day-width', `${DAY_WIDTH}px`);
+        els.zoomLabel.textContent = zoomModeLabel(ui.zoomMode);
+        els.zoomOutButton.disabled = ui.zoomMode === ZOOM_MODES[0];
+        els.zoomInButton.disabled = ui.zoomMode === ZOOM_MODES.at(-1);
+        const timelineWidth = dates.length * DAY_WIDTH;
+        const visible = visibleEvents();
+
+        els.ganttContent.innerHTML = `
+          <div class="gantt-header">
+            <div class="header-cell header-event">事件<span class="column-resizer" id="eventColumnResizer" title="拖动调整事件列宽"></span></div>
+            <div class="header-cell header-info">时间</div>
+            <div class="timeline-header" style="width:${timelineWidth}px">
+              ${renderMonthHeader(dates)}
+              <div class="day-row">${dates.map(renderDayHeader).join('')}</div>
+            </div>
+          </div>
+          <div class="gantt-body">
+            ${visible.map(({ event, depth }) => renderEventRow(event, depth, dates, timelineWidth)).join('')}
+          </div>
+        `;
+
+        els.ganttContent.querySelectorAll('.gantt-row').forEach(row => {
+          row.addEventListener('click', () => openEditor(row.dataset.eventId));
+          row.addEventListener('dragover', handleRowDragOver);
+          row.addEventListener('dragleave', event => {
+            if (!row.contains(event.relatedTarget)) clearDropIndicators();
+          });
+          row.addEventListener('drop', handleRowDrop);
+        });
+
+        els.ganttContent.querySelectorAll('.drag-handle').forEach(handle => {
+          handle.addEventListener('click', event => event.stopPropagation());
+          handle.addEventListener('dragstart', handleDragStart);
+          handle.addEventListener('dragend', handleDragEnd);
+        });
+
+        els.ganttContent.querySelectorAll('.collapse-button').forEach(button => {
+          button.addEventListener('click', event => {
+            event.stopPropagation();
+            const id = button.dataset.eventId;
+            if (ui.collapsed.has(id)) ui.collapsed.delete(id); else ui.collapsed.add(id);
+            render();
+          });
+        });
+
+        els.ganttContent.querySelectorAll('.add-child-inline').forEach(button => {
+          button.addEventListener('click', event => {
+            event.stopPropagation();
+            createEvent(button.dataset.parentId);
+          });
+        });
+        bindEventColumnResize();
+        bindScheduleDrag();
+      }
+
+      function bindEventColumnResize() {
+        const resizer = document.getElementById('eventColumnResizer');
+        if (!resizer) return;
+        resizer.addEventListener('pointerdown', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          const startX = event.clientX;
+          const startWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--event-width')) || 350;
+          resizer.classList.add('resizing');
+          document.body.classList.add('resizing-column');
+          const move = moveEvent => {
+            const width = Math.min(650, Math.max(260, startWidth + moveEvent.clientX - startX));
+            document.documentElement.style.setProperty('--event-width', `${width}px`);
+          };
+          const end = endEvent => {
+            move(endEvent);
+            const width = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--event-width')) || 350;
+            localStorage.setItem('project-gantt-event-column-width', String(Math.round(width)));
+            resizer.classList.remove('resizing');
+            document.body.classList.remove('resizing-column');
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', end);
+          };
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', end, { once: true });
+        });
+      }
+
+      function snapToWorkingDay(date, direction) {
+        let result = date;
+        const step = direction < 0 ? -1 : 1;
+        for (let attempts = 0; attempts < 14 && !isWorkingDay(result); attempts += 1) result = addDays(result, step);
+        return result;
+      }
+
+      function shiftedWorkingRange(start, end, delta) {
+        const span = dayDiff(start, end);
+        const direction = delta < 0 ? -1 : 1;
+        let nextStart = addDays(start, delta);
+        let nextEnd = addDays(nextStart, span);
+        for (let attempts = 0; attempts < 14 && (!isWorkingDay(nextStart) || !isWorkingDay(nextEnd)); attempts += 1) {
+          nextStart = addDays(nextStart, direction);
+          nextEnd = addDays(nextStart, span);
+        }
+        return { start: nextStart, end: nextEnd };
+      }
+
+      function bindScheduleDrag() {
+        els.ganttContent.querySelectorAll('.draggable-bar').forEach(bar => {
+          bar.addEventListener('click', event => event.stopPropagation());
+          bar.addEventListener('pointerdown', event => {
+            if (event.button !== 0) return;
+            const sourceEvent = eventById(bar.dataset.eventId);
+            if (!sourceEvent || childrenOf(sourceEvent.id).length) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const mode = event.target.closest('.bar-date-handle')?.dataset.dragMode || 'move';
+            const startX = event.clientX;
+            const original = { start: sourceEvent.start, end: sourceEvent.end };
+            let deltaDays = 0;
+            document.body.classList.add('dragging-schedule');
+            const move = moveEvent => {
+              deltaDays = Math.round((moveEvent.clientX - startX) / DAY_WIDTH);
+              if (mode === 'move') bar.style.transform = `translateX(${deltaDays * DAY_WIDTH}px)`;
+              if (mode === 'resize-start') {
+                const bounded = Math.min(deltaDays, dayDiff(original.start, original.end));
+                bar.style.transform = `translateX(${bounded * DAY_WIDTH}px)`;
+                bar.style.width = `${Math.max(18, (dayDiff(addDays(original.start, bounded), original.end) + 1) * DAY_WIDTH - 10)}px`;
+              }
+              if (mode === 'resize-end') {
+                const bounded = Math.max(deltaDays, -dayDiff(original.start, original.end));
+                bar.style.width = `${Math.max(18, (dayDiff(original.start, addDays(original.end, bounded)) + 1) * DAY_WIDTH - 10)}px`;
+              }
+            };
+            const end = () => {
+              if (deltaDays) {
+                if (mode === 'move') {
+                  const shifted = shiftedWorkingRange(original.start, original.end, deltaDays);
+                  sourceEvent.start = shifted.start;
+                  sourceEvent.end = shifted.end;
+                } else if (mode === 'resize-start') {
+                  const bounded = Math.min(deltaDays, dayDiff(original.start, original.end));
+                  sourceEvent.start = snapToWorkingDay(addDays(original.start, bounded), bounded < 0 ? -1 : 1);
+                  if (sourceEvent.start > sourceEvent.end) sourceEvent.start = sourceEvent.end;
+                } else {
+                  const bounded = Math.max(deltaDays, -dayDiff(original.start, original.end));
+                  sourceEvent.end = snapToWorkingDay(addDays(original.end, bounded), bounded < 0 ? -1 : 1);
+                  if (sourceEvent.end < sourceEvent.start) sourceEvent.end = sourceEvent.start;
+                }
+                const peopleError = validateEventPeople(
+                  sourceEvent,
+                  sourceEvent.assignments || [],
+                  sourceEvent.reportTo || [],
+                  sourceEvent.attendeeIds || [],
+                  effectiveRange(sourceEvent)
+                );
+                if (peopleError) {
+                  sourceEvent.start = original.start;
+                  sourceEvent.end = original.end;
+                  showToast(`未调整：${peopleError}`);
+                } else {
+                  persist();
+                  showToast(mode === 'move' ? '事件时间区间已移动' : '事件起止日期已调整');
+                }
+              }
+              document.body.classList.remove('dragging-schedule');
+              window.removeEventListener('pointermove', move);
+              render();
+            };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', end, { once: true });
+          });
+        });
+      }
+
+      function renderMonthHeader(dates) {
+        const segments = [];
+        let startIndex = 0;
+        let monthKey = dates[0].slice(0, 7);
+
+        const pushSegment = endIndex => {
+          const [year, month] = monthKey.split('-');
+          segments.push(`<div class="month-segment" style="left:${startIndex * DAY_WIDTH}px;width:${(endIndex - startIndex) * DAY_WIDTH}px">${year}年${Number(month)}月</div>`);
+        };
+
+        dates.forEach((date, index) => {
+          const key = date.slice(0, 7);
+          if (key !== monthKey) {
+            pushSegment(index);
+            monthKey = key;
+            startIndex = index;
+          }
+        });
+        pushSegment(dates.length);
+        return `<div class="month-row">${segments.join('')}</div>`;
+      }
+
+      function renderDayHeader(date) {
+        const classes = ['day-cell'];
+        if (!isWorkingDay(date)) classes.push('non-working-day');
+        if (date === TODAY) classes.push('today');
+        if (highlightedPersonDates().has(date)) classes.push('person-involved-date');
+        const milestone = data.events.find(event => {
+          if (event.kind !== 'external' && event.kind !== 'internal') return false;
+          return effectiveRange(event).start === date;
+        });
+        const calendarNote = (data.workdayOverrides || []).includes(date)
+          ? '｜人为设定加班工作日'
+          : HOLIDAY_NAMES.get(date)
+          ? `｜${HOLIDAY_NAMES.get(date)}放假`
+          : ADJUSTED_WORKDAYS.has(date) ? '｜调休上班' : !isWorkingDay(date) ? '｜非工作日' : '';
+        const label = DAY_WIDTH < 14 ? '' : `<span>${parseDate(date).getUTCDate()}</span><small>${weekdayLabel(date)}</small>`;
+        const milestoneLabel = milestone ? `｜${eventKindLabel(milestone.kind)}：${milestone.name}` : '';
+        const flag = milestone
+          ? `<i class="milestone-flag ${milestone.kind}" title="${escapeHtml(eventKindLabel(milestone.kind))}：${escapeHtml(milestone.name)}"></i>`
+          : '';
+        return `<div class="${classes.join(' ')}" title="${date}${calendarNote}${escapeHtml(milestoneLabel)}">${flag}${label}</div>`;
+      }
+
+      function renderEventRow(event, depth, dates, timelineWidth) {
+        const children = childrenOf(event.id);
+        const hasChildren = children.length > 0;
+        const range = effectiveRange(event);
+        const startIndex = dates.indexOf(range.start);
+        const span = dayDiff(range.start, range.end) + 1;
+        const barLeft = startIndex * DAY_WIDTH + 5;
+        const barWidth = Math.max(span * DAY_WIDTH - 10, 18);
+        const lead = event.assignments?.find(item => item.role === 'lead');
+        const label = hasChildren ? '' : escapeHtml(event.name);
+        const rowClasses = ['gantt-row', `level-${Math.min(depth, 2)}`];
+        if (ui.selectedId === event.id) rowClasses.push('selected');
+        if (ui.kindFilter) rowClasses.push(event.kind === ui.kindFilter ? 'kind-filter-match' : 'kind-dimmed');
+        let personInvolvementOverlays = '';
+        if (ui.highlightedPersonId) {
+          const direct = personDirectlyInvolvesEvent(event, ui.highlightedPersonId);
+          const involvedDescendants = hasChildren ? personInvolvedDescendants(event, ui.highlightedPersonId) : [];
+          rowClasses.push(direct ? 'person-participant' : involvedDescendants.length ? 'person-ancestor' : 'person-dimmed');
+          if (involvedDescendants.length) personInvolvementOverlays = renderPersonInvolvementOverlays(event, range, involvedDescendants);
+        }
+        const importantOverlays = hasChildren ? renderAncestorImportantOverlays(event, range) : '';
+
+        return `
+          <div class="${rowClasses.join(' ')}" data-event-id="${event.id}">
+            <div class="sticky-cell event-cell">
+              <div class="event-content">
+                <span class="indent" style="width:${depth * 20}px"></span>
+                <button class="drag-handle" draggable="true" data-event-id="${event.id}" aria-label="拖动 ${escapeHtml(event.name)} 调整顺序或层级" title="拖动调整顺序或层级">⠿</button>
+                ${hasChildren
+                  ? `<button class="collapse-button" data-event-id="${event.id}" aria-label="${ui.collapsed.has(event.id) ? '展开' : '折叠'} ${escapeHtml(event.name)}">${ui.collapsed.has(event.id) ? '›' : '⌄'}</button>`
+                  : '<span class="collapse-spacer"></span>'}
+                <span class="event-name-wrap">
+                  <span class="event-name" title="${escapeHtml(event.name)}">${escapeHtml(event.name)}</span>
+                  <span class="event-subline">${hasChildren ? `${children.length} 个直接子事件` : `${workdayCount(range.start, range.end)} 个工作日`}</span>
+                </span>
+                <button class="add-child-inline" data-parent-id="${event.id}" aria-label="为 ${escapeHtml(event.name)} 添加子事件" title="添加子事件">＋</button>
+              </div>
+            </div>
+            <div class="sticky-cell info-cell">
+              <div class="info-stack">
+                <div class="date-line"><span>${formatDate(range.start)}—${formatDate(range.end)}</span><span>${eventKindLabel(event.kind)}</span></div>
+                <div class="person-line" title="${escapeHtml(assignmentSummary(event))}">${lead ? `主责：${escapeHtml(personName(lead.personId))}` : assignmentSummary(event)}</div>
+              </div>
+            </div>
+            <div class="timeline-cell" style="width:${timelineWidth}px">
+              ${renderNonWorkingDayBands(dates)}
+              ${renderPersonDateColumns(dates)}
+              ${dates.includes(TODAY) ? `<span class="today-line" style="left:${dates.indexOf(TODAY) * DAY_WIDTH + DAY_WIDTH / 2}px"></span>` : ''}
+              <div class="bar ${event.kind} ${hasChildren ? 'parent' : 'draggable-bar'} ${depth === 0 ? 'level-0' : ''}" data-event-id="${event.id}" style="left:${barLeft}px;width:${barWidth}px" title="${escapeHtml(event.name)}｜${range.start}—${range.end}">
+                ${importantOverlays}
+                ${personInvolvementOverlays}
+                ${hasChildren ? '' : '<span class="bar-date-handle start" data-drag-mode="resize-start"></span>'}
+                ${label}
+                ${hasChildren ? '' : '<span class="bar-date-handle end" data-drag-mode="resize-end"></span>'}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderAncestorImportantOverlays(event, parentRange) {
+        const parentSpan = dayDiff(parentRange.start, parentRange.end) + 1;
+        return descendantIds(event.id).map(eventById).filter(descendant => descendant && (descendant.kind === 'external' || descendant.kind === 'internal')).map(descendant => {
+          const range = effectiveRange(descendant);
+          const clippedStart = range.start < parentRange.start ? parentRange.start : range.start;
+          const clippedEnd = range.end > parentRange.end ? parentRange.end : range.end;
+          if (clippedEnd < clippedStart) return '';
+          const left = dayDiff(parentRange.start, clippedStart) / parentSpan * 100;
+          const width = (dayDiff(clippedStart, clippedEnd) + 1) / parentSpan * 100;
+          return `<span class="ancestor-important-overlay ${descendant.kind}" style="left:${left}%;width:${width}%" title="${escapeHtml(eventKindLabel(descendant.kind))}｜${escapeHtml(descendant.name)}｜${range.start}—${range.end}"></span>`;
+        }).join('');
+      }
+
+      function renderPersonInvolvementOverlays(event, parentRange, involvedDescendants) {
+        const parentSpan = dayDiff(parentRange.start, parentRange.end) + 1;
+        return involvedDescendants.map(descendant => {
+          const range = effectiveRange(descendant);
+          const clippedStart = range.start < parentRange.start ? parentRange.start : range.start;
+          const clippedEnd = range.end > parentRange.end ? parentRange.end : range.end;
+          if (clippedEnd < clippedStart) return '';
+          const left = dayDiff(parentRange.start, clippedStart) / parentSpan * 100;
+          const width = (dayDiff(clippedStart, clippedEnd) + 1) / parentSpan * 100;
+          return `<span class="person-involvement-overlay" style="left:${left}%;width:${width}%" title="${escapeHtml(personName(ui.highlightedPersonId))}参与｜${escapeHtml(descendant.name)}｜${range.start}—${range.end}"></span>`;
+        }).join('');
+      }
+
+      function renderNonWorkingDayBands(dates) {
+        return dates.map((date, index) => !isWorkingDay(date)
+          ? `<span class="non-working-day-band" style="left:${index * DAY_WIDTH}px;width:${DAY_WIDTH}px" title="${date}${HOLIDAY_NAMES.has(date) ? `｜${HOLIDAY_NAMES.get(date)}放假` : '｜非工作日'}"></span>`
+          : '').join('');
+      }
+
+      function eventKindLabel(kind) {
+        return { regular: '常规', external: '外部重要节点', internal: '内部重要节点' }[kind] || '常规';
+      }
+
+      function updateLegendFilterButtons() {
+        document.querySelectorAll('.legend-filter').forEach(button => {
+          const active = button.dataset.kindFilter === ui.kindFilter;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+      }
+
+      function toggleKindFilter(kind) {
+        ui.kindFilter = ui.kindFilter === kind ? null : kind;
+        render();
+        showToast(ui.kindFilter ? `已突出显示${eventKindLabel(kind)}` : '已取消节点类型筛选');
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+      }
+
+      function openEditor(id) {
+        const event = eventById(id);
+        if (!event) return;
+        ui.selectedId = id;
+        ui.draftId = id;
+        render();
+
+        const hasChildren = childrenOf(id).length > 0;
+        const range = effectiveRange(event);
+        els.editorPath.textContent = eventPath(event);
+        els.eventName.value = event.name;
+        els.eventKind.value = event.kind || 'regular';
+        els.eventStart.value = range.start;
+        els.eventEnd.value = range.end;
+        els.eventStart.disabled = hasChildren;
+        els.eventEnd.disabled = hasChildren;
+        els.dateRangeButton.disabled = hasChildren;
+        updateDateRangeButton();
+        els.dateHelp.textContent = hasChildren
+          ? '这是父事件，日期由全部子事件的最早开始日和最晚结束日自动汇总。'
+          : `当前排期包含 ${workdayCount(range.start, range.end)} 个工作日。`;
+
+        renderLeadOptions(event);
+        renderAssistantOptions(event);
+        renderReportTargets(event);
+        updateDateWarning();
+
+        els.drawerBackdrop.classList.add('open');
+        els.editorDrawer.classList.add('open');
+        setTimeout(() => els.eventName.focus(), 80);
+      }
+
+      function closeEditor() {
+        els.drawerBackdrop.classList.remove('open');
+        els.editorDrawer.classList.remove('open');
+        ui.selectedId = null;
+        ui.draftId = null;
+        render();
+      }
+
+      function renderLeadOptions(event) {
+        const lead = event.assignments?.find(item => item.role === 'lead');
+        const range = effectiveRange(event);
+        els.leadPerson.innerHTML = `<option value="">暂不指定</option>${projectMembers().map(person => {
+          const availability = personAvailabilityForRange(person, range);
+          const unavailable = availability.status !== 'available' && person.id !== lead?.personId;
+          const suffix = availabilityLabel(availability);
+          return `<option value="${person.id}" ${unavailable ? 'disabled' : ''}>${escapeHtml(person.name)}${suffix ? `｜${escapeHtml(suffix)}` : ''}</option>`;
+        }).join('')}`;
+        els.leadPerson.value = lead?.personId || '';
+      }
+
+      function renderAssistantOptions(event) {
+        const leadId = event.assignments?.find(item => item.role === 'lead')?.personId || '';
+        const assistants = new Map((event.assignments || []).filter(item => item.role === 'assist').map(item => [item.personId, item]));
+        const range = effectiveRange(event);
+
+        els.assistantList.innerHTML = projectMembers().map(person => {
+          const assignment = assistants.get(person.id);
+          const checked = Boolean(assignment);
+          const availability = personAvailabilityForRange(person, range);
+          const unavailable = availability.status !== 'available';
+          const suffix = availabilityLabel(availability);
+          const disabled = person.id === leadId || (unavailable && !checked);
+          return `
+            <div class="assignment-row" data-person-id="${person.id}">
+              <label class="assignment-person">
+                <input class="assistant-check" type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+                <span>${escapeHtml(person.name)}｜${escapeHtml(personDisplayRole(person))}${person.id === leadId ? '（已为主责）' : suffix ? `（${escapeHtml(suffix)}）` : ''}</span>
+              </label>
+              <div class="load-readonly">${checked ? '已选择参与' : '未选择'}</div>
+            </div>
+          `;
+        }).join('');
+
+        els.assistantList.querySelectorAll('.assistant-check').forEach(checkbox => {
+          checkbox.addEventListener('change', () => {
+            checkbox.closest('.assignment-row').querySelector('.load-readonly').style.opacity = checkbox.checked ? '1' : '.42';
+          });
+        });
+      }
+
+      function renderReportTargets(event) {
+        const selectedIds = new Set([...(event.reportTo || []), ...(event.attendeeIds || [])]);
+        const rolePriority = person => {
+          const role = personDisplayRole(person).replaceAll(' ', '').toLowerCase();
+          if (role.includes('项目总监')) return 0;
+          if (role.includes('行业总')) return 1;
+          if (role.includes('ceo') || role.includes('首席执行官')) return 2;
+          if (person.category === 'projectLeader') return 3;
+          if (person.category === 'clientExecutive') return 4;
+          return 5;
+        };
+        const stakeholders = data.people.filter(person => person.category !== 'projectMember').sort((a, b) => rolePriority(a) - rolePriority(b));
+        const range = effectiveRange(event);
+        els.reportTargetHelp.textContent = '项目总监 → 行业总 → CEO → 企业客户。选择客户企业时优先判定为外部重要节点。';
+        els.reportTargetList.innerHTML = stakeholders.length ? stakeholders.map(person => {
+          const selected = selectedIds.has(person.id);
+          const availability = personAvailabilityForRange(person, range);
+          const unavailable = availability.status !== 'available';
+          const suffix = availabilityLabel(availability);
+          return `
+            <div class="stakeholder-row" data-person-id="${person.id}">
+              <label class="stakeholder-person">
+                <input class="stakeholder-check" type="checkbox" ${selected ? 'checked' : ''} ${unavailable && !selected ? 'disabled' : ''}>
+                <span>${escapeHtml(person.name)}｜${escapeHtml(personDisplayRole(person))}${suffix ? `（${escapeHtml(suffix)}）` : ''}</span>
+              </label>
+            </div>
+          `;
+        }).join('') : '<div class="empty-records">尚无非项目组员，请先在人员侧边栏中新增。</div>';
+        els.reportTargetList.querySelectorAll('.stakeholder-check').forEach(checkbox => {
+          checkbox.addEventListener('change', updateAutomaticEventKind);
+        });
+        updateAutomaticEventKind();
+      }
+
+      function updateAutomaticEventKind() {
+        const selectedPeople = [...els.reportTargetList.querySelectorAll('.stakeholder-row')]
+          .filter(row => row.querySelector('.stakeholder-check').checked)
+          .map(row => data.people.find(person => person.id === row.dataset.personId))
+          .filter(Boolean);
+        els.eventKind.value = selectedPeople.some(person => person.category === 'clientExecutive')
+          ? 'external'
+          : selectedPeople.some(person => person.category === 'projectLeader') ? 'internal' : 'regular';
+      }
+
+      function updateDateRangeButton() {
+        const start = els.eventStart.value;
+        const end = els.eventEnd.value;
+        els.dateRangeButton.textContent = start && end
+          ? `${start.replaceAll('-', '/')}　→　${end.replaceAll('-', '/')}`
+          : '选择开始与结束日期';
+      }
+
+      function updatePersonDateRangeButton() {
+        const start = els.personAvailableFromInput.value;
+        const end = els.personAvailableToInput.value;
+        const startLabel = ui.personStartBoundary === 'project' ? '项目开始' : start ? start.replaceAll('-', '/') : '';
+        const endLabel = ui.personEndBoundary === 'project' ? '项目结束' : end ? end.replaceAll('-', '/') : '';
+        els.personDateRangeButton.textContent = startLabel && endLabel
+          ? `${startLabel}　→　${endLabel}`
+          : '选择参与开始与结束日期';
+      }
+
+      function setPersonParticipationMode(mode) {
+        const normalized = mode === 'custom' ? 'custom' : 'full';
+        const radio = document.querySelector(`input[name="personParticipationMode"][value="${normalized}"]`);
+        if (radio) radio.checked = true;
+        els.personDateRangeField.hidden = normalized === 'full';
+      }
+
+      function activeRangeInputs() {
+        return ui.rangeTarget === 'person'
+          ? { start: els.personAvailableFromInput, end: els.personAvailableToInput }
+          : { start: els.eventStart, end: els.eventEnd };
+      }
+
+      function openDateRangePicker(target = 'event') {
+        if (target === 'event' && els.dateRangeButton.disabled) return;
+        ui.rangeTarget = target;
+        const inputs = activeRangeInputs();
+        ui.rangeSelectionStart = null;
+        ui.calendarMonth = (inputs.start.value || TODAY).slice(0, 7);
+        renderDateRangeCalendar();
+        els.dateRangeDialog.showModal();
+      }
+
+      function changeCalendarMonth(amount) {
+        const date = parseDate(`${ui.calendarMonth}-01`);
+        date.setUTCMonth(date.getUTCMonth() + amount);
+        ui.calendarMonth = toDateString(date).slice(0, 7);
+        renderDateRangeCalendar();
+      }
+
+      function renderDateRangeCalendar() {
+        const monthStart = `${ui.calendarMonth}-01`;
+        const gridStart = addDays(monthStart, -parseDate(monthStart).getUTCDay());
+        const dates = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+        const inputs = activeRangeInputs();
+        const selectedStart = ui.rangeSelectionStart || inputs.start.value;
+        const selectedEnd = ui.rangeSelectionStart ? null : inputs.end.value;
+        const [year, month] = ui.calendarMonth.split('-');
+        els.calendarMonthTitle.textContent = `${year}年${Number(month)}月`;
+        els.calendarStatus.textContent = ui.rangeSelectionStart
+          ? `开始日期：${ui.rangeSelectionStart}。请点击结束日期。`
+          : '请点击开始日期';
+        els.calendarBoundaryActions.hidden = ui.rangeTarget !== 'person';
+        els.useProjectStartButton.hidden = ui.rangeTarget !== 'person' || Boolean(ui.rangeSelectionStart);
+        els.useProjectEndButton.hidden = ui.rangeTarget !== 'person' || !ui.rangeSelectionStart;
+        els.calendarGrid.innerHTML = dates.map(date => {
+          const working = isWorkingDay(date);
+          const classes = ['calendar-day'];
+          if (date.slice(0, 7) !== ui.calendarMonth) classes.push('outside');
+          if (!working) classes.push('non-working');
+          if (selectedStart && selectedEnd && date > selectedStart && date < selectedEnd) classes.push('in-range');
+          if (date === selectedStart) classes.push('range-start');
+          if (date === selectedEnd) classes.push('range-end');
+          const note = working ? '' : HOLIDAY_NAMES.has(date) ? `，${HOLIDAY_NAMES.get(date)}放假` : '，非工作日';
+          return `<button class="${classes.join(' ')}" data-date="${date}" ${working ? '' : 'disabled'} title="${date}${note}">${parseDate(date).getUTCDate()}</button>`;
+        }).join('');
+        els.calendarGrid.querySelectorAll('.calendar-day:not(:disabled)').forEach(button => {
+          button.addEventListener('click', () => selectRangeDate(button.dataset.date));
+        });
+      }
+
+      function selectRangeDate(date) {
+        if (!ui.rangeSelectionStart) {
+          if (ui.rangeTarget === 'person') ui.personStartBoundary = 'date';
+          ui.rangeSelectionStart = date;
+          renderDateRangeCalendar();
+          return;
+        }
+        if (date < ui.rangeSelectionStart) {
+          ui.rangeSelectionStart = date;
+          renderDateRangeCalendar();
+          els.calendarStatus.textContent = `已重新选择开始日期：${date}。请点击更晚的结束日期。`;
+          return;
+        }
+        const inputs = activeRangeInputs();
+        inputs.start.value = ui.rangeSelectionStart;
+        inputs.end.value = date;
+        if (ui.rangeTarget === 'person') ui.personEndBoundary = 'date';
+        ui.rangeSelectionStart = null;
+        if (ui.rangeTarget === 'person') updatePersonDateRangeButton();
+        else {
+          updateDateRangeButton();
+          updateDateWarning();
+        }
+        els.dateRangeDialog.close();
+      }
+
+      function useProjectStartBoundary() {
+        if (ui.rangeTarget !== 'person') return;
+        const range = projectDateRange();
+        ui.personStartBoundary = 'project';
+        ui.rangeSelectionStart = range.start;
+        els.personAvailableFromInput.value = range.start;
+        renderDateRangeCalendar();
+        els.calendarStatus.textContent = `起始边界：项目开始（当前为 ${range.start}）。请选择结束日期。`;
+      }
+
+      function useProjectEndBoundary() {
+        if (ui.rangeTarget !== 'person' || !ui.rangeSelectionStart) return;
+        const range = projectDateRange();
+        if (range.end < ui.rangeSelectionStart) return showToast('项目结束日期不能早于参与开始日期');
+        ui.personEndBoundary = 'project';
+        els.personAvailableFromInput.value = ui.rangeSelectionStart;
+        els.personAvailableToInput.value = range.end;
+        ui.rangeSelectionStart = null;
+        updatePersonDateRangeButton();
+        els.dateRangeDialog.close();
+      }
+
+      function updateDateWarning() {
+        const start = els.eventStart.value;
+        const end = els.eventEnd.value;
+        if (!start || !end) {
+          els.dateWarning.style.display = 'none';
+          return;
+        }
+        if (end < start) {
+          els.dateWarning.textContent = '结束日期不能早于开始日期。';
+          els.dateWarning.style.display = 'block';
+          return;
+        }
+        const nonWorkingDays = enumerateDates(start, end).filter(date => !isWorkingDay(date)).length;
+        if (nonWorkingDays) {
+          els.dateWarning.textContent = `这段排期包含 ${nonWorkingDays} 个非工作日，已按 2026 年法定放假调休安排从工作日中扣除。确需加班时可保留该日期。`;
+          els.dateWarning.style.display = 'block';
+        } else {
+          els.dateWarning.style.display = 'none';
+        }
+      }
+
+      function validateEventPeople(event, assignments, reportTo, attendeeIds, rangeOverride = null) {
+        const range = rangeOverride || effectiveRange({ ...event, start: els.eventStart.disabled ? event.start : els.eventStart.value, end: els.eventEnd.disabled ? event.end : els.eventEnd.value });
+        const involvedIds = new Set([...assignments.map(item => item.personId), ...reportTo, ...attendeeIds]);
+        for (const personId of involvedIds) {
+          const person = data.people.find(item => item.id === personId);
+          if (!person) continue;
+          const availability = personAvailabilityForRange(person, range);
+          if (availability.status !== 'available') {
+            return `${person.name}的参与日期为 ${availability.available.start}—${availability.available.end}，不能覆盖当前事件 ${range.start}—${range.end}`;
+          }
+        }
+
+        return '';
+      }
+
+      function saveEditor() {
+        const event = eventById(ui.draftId);
+        if (!event) return;
+        const hasChildren = childrenOf(event.id).length > 0;
+
+        const name = els.eventName.value.trim();
+        if (!name) return showToast('请填写事件名称');
+        if (!els.eventStart.disabled && (!els.eventStart.value || !els.eventEnd.value)) return showToast('请填写完整日期');
+        if (!els.eventStart.disabled && els.eventEnd.value < els.eventStart.value) return showToast('结束日期不能早于开始日期');
+        const participantIds = [];
+        els.reportTargetList.querySelectorAll('.stakeholder-row').forEach(row => {
+          if (!row.querySelector('.stakeholder-check').checked) return;
+          participantIds.push(row.dataset.personId);
+        });
+        const selectedPeople = participantIds.map(id => data.people.find(person => person.id === id)).filter(Boolean);
+        const automaticKind = selectedPeople.some(person => person.category === 'clientExecutive')
+          ? 'external'
+          : selectedPeople.some(person => person.category === 'projectLeader') ? 'internal' : 'regular';
+
+        const assignments = [];
+        if (els.leadPerson.value) {
+          assignments.push({
+            personId: els.leadPerson.value,
+            role: 'lead'
+          });
+        }
+
+        els.assistantList.querySelectorAll('.assignment-row').forEach(row => {
+          const checkbox = row.querySelector('.assistant-check');
+          if (!checkbox.checked || checkbox.disabled) return;
+          assignments.push({
+            personId: row.dataset.personId,
+            role: 'assist'
+          });
+        });
+        const peopleError = validateEventPeople(event, assignments, participantIds, []);
+        if (peopleError) return showToast(peopleError);
+
+        event.name = name;
+        event.kind = automaticKind;
+        event.reportTo = participantIds;
+        event.attendeeIds = [];
+        if (!els.eventStart.disabled) {
+          event.start = els.eventStart.value;
+          event.end = els.eventEnd.value;
+        }
+        event.assignments = assignments;
+
+        persist();
+        closeEditor();
+        showToast('事件已保存');
+      }
+
+      function clampLoad(value, fallback) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return fallback;
+        return Math.min(100, Math.max(0, number));
+      }
+
+      function createEvent(parentId) {
+        const parent = parentId ? eventById(parentId) : null;
+        const parentRange = parent ? effectiveRange(parent) : { start: TODAY, end: addDays(TODAY, 4) };
+        const id = `event-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`;
+        data.events.push({
+          id,
+          parentId: parent?.id || null,
+          name: parent ? '新子事件' : '新一级事件',
+          start: parentRange.start,
+          end: parentRange.end,
+          kind: 'regular',
+          locked: false,
+          reportTo: [],
+          attendeeIds: [],
+          assignments: []
+        });
+        if (parent) ui.collapsed.delete(parent.id);
+        persist();
+        render();
+        openEditor(id);
+      }
+
+      function deleteCurrentEvent() {
+        const event = eventById(ui.draftId);
+        if (!event) return;
+        const descendants = descendantIds(event.id);
+        const count = descendants.length;
+        const question = count
+          ? `删除“${event.name}”会同时删除其 ${count} 个下级事件，是否继续？`
+          : `确定删除“${event.name}”吗？`;
+        if (!window.confirm(question)) return;
+        const ids = new Set([event.id, ...descendants]);
+        data.events = data.events.filter(item => !ids.has(item.id));
+        ids.forEach(id => ui.collapsed.delete(id));
+        persist();
+        closeEditor();
+        showToast('事件已删除');
+      }
+
+      function descendantIds(id) {
+        const result = [];
+        childrenOf(id).forEach(child => {
+          result.push(child.id, ...descendantIds(child.id));
+        });
+        return result;
+      }
+
+      function clearDropIndicators() {
+        els.ganttContent.querySelectorAll('.drop-before, .drop-inside, .drop-after').forEach(row => {
+          row.classList.remove('drop-before', 'drop-inside', 'drop-after');
+        });
+        ui.dropMode = null;
+      }
+
+      function handleDragStart(event) {
+        const id = event.currentTarget.dataset.eventId;
+        ui.draggingId = id;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', id);
+        requestAnimationFrame(() => {
+          const row = [...els.ganttContent.querySelectorAll('.gantt-row')].find(item => item.dataset.eventId === id);
+          row?.classList.add('dragging');
+        });
+      }
+
+      function handleDragEnd() {
+        els.ganttContent.querySelectorAll('.dragging').forEach(row => row.classList.remove('dragging'));
+        clearDropIndicators();
+        ui.draggingId = null;
+      }
+
+      function dropModeForPointer(row, clientY) {
+        const rect = row.getBoundingClientRect();
+        const ratio = (clientY - rect.top) / rect.height;
+        if (ratio < .28) return 'before';
+        if (ratio > .72) return 'after';
+        return 'inside';
+      }
+
+      function handleRowDragOver(event) {
+        const targetId = event.currentTarget.dataset.eventId;
+        const movingId = ui.draggingId || event.dataTransfer.getData('text/plain');
+        if (!movingId || movingId === targetId || descendantIds(movingId).includes(targetId)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        clearDropIndicators();
+        ui.dropMode = dropModeForPointer(event.currentTarget, event.clientY);
+        event.currentTarget.classList.add(`drop-${ui.dropMode}`);
+      }
+
+      function handleRowDrop(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const movingId = ui.draggingId || event.dataTransfer.getData('text/plain');
+        const targetId = event.currentTarget.dataset.eventId;
+        const mode = ui.dropMode || dropModeForPointer(event.currentTarget, event.clientY);
+        if (!moveEvent(movingId, targetId, mode)) {
+          clearDropIndicators();
+          return;
+        }
+        persist();
+        ui.collapsed.delete(targetId);
+        render();
+        showToast(mode === 'inside' ? '已移动为目标事件的子事件' : '事件顺序与层级已更新');
+      }
+
+      function moveEvent(movingId, targetId, mode) {
+        const moving = eventById(movingId);
+        const target = eventById(targetId);
+        if (!moving || !target || moving.id === target.id) return false;
+        if (descendantIds(moving.id).includes(target.id)) {
+          showToast('不能把事件移动到自己的下级中');
+          return false;
+        }
+
+        data.events.splice(data.events.indexOf(moving), 1);
+        const targetIndex = data.events.indexOf(target);
+        if (mode === 'inside') {
+          moving.parentId = target.id;
+          data.events.splice(targetIndex + 1, 0, moving);
+        } else {
+          moving.parentId = target.parentId || null;
+          data.events.splice(targetIndex + (mode === 'after' ? 1 : 0), 0, moving);
+        }
+        return true;
+      }
+
+      function selectedPerson() {
+        return data.people.find(person => person.id === ui.selectedPersonId) || null;
+      }
+
+      function personParticipations(personId) {
+        return data.events.flatMap(event => {
+          const assignment = (event.assignments || []).find(item => item.personId === personId);
+          const reportsToPerson = (event.reportTo || []).includes(personId);
+          const attends = (event.attendeeIds || []).includes(personId);
+          const relationship = assignment || (reportsToPerson ? { role: 'report', load: null } : attends ? { role: 'attend', load: null } : null);
+          return relationship ? [{ event, assignment: relationship, range: effectiveRange(event) }] : [];
+        }).sort((a, b) => a.range.start.localeCompare(b.range.start) || a.range.end.localeCompare(b.range.end));
+      }
+
+      function setPersonHighlight(personId) {
+        ui.highlightedPersonId = ui.highlightedPersonId === personId ? null : personId;
+        const person = data.people.find(item => item.id === ui.highlightedPersonId);
+        if (person?.category === 'projectMember') {
+          openFloatingLoadPanel(person);
+        } else {
+          els.floatingLoadPanel.hidden = true;
+        }
+        render();
+        renderPeopleSidebar();
+      }
+
+      function clearPersonHighlight() {
+        ui.highlightedPersonId = null;
+        els.floatingLoadPanel.hidden = true;
+        render();
+        renderPeopleSidebar();
+        showToast('已清除人员高亮');
+      }
+
+      function openFloatingLoadPanel(person) {
+        els.floatingLoadPanel.hidden = false;
+        els.floatingLoadTitle.textContent = `${person.name}｜每日精力分配`;
+        const range = personParticipationRange(person);
+        if (!els.floatingLoadDateInput.value || els.floatingLoadDateInput.value < range.start || els.floatingLoadDateInput.value > range.end) {
+          els.floatingLoadDateInput.value = range.start;
+        }
+        els.floatingLoadDateInput.min = range.start;
+        els.floatingLoadDateInput.max = range.end;
+        renderFloatingLoadPanel(person);
+      }
+
+      function renderFloatingLoadPanel(person) {
+        if (!person || person.category !== 'projectMember') return;
+        const date = els.floatingLoadDateInput.value;
+        const entries = data.events.flatMap(event => {
+          if (childrenOf(event.id).length) return [];
+          const assignment = (event.assignments || []).find(item => item.personId === person.id);
+          if (!assignment) return [];
+          const range = effectiveRange(event);
+          return date >= range.start && date <= range.end ? [{ event, assignment, load: assignmentLoadForDate(event, assignment, date) }] : [];
+        });
+        const capacity = person.dailyCapacity ?? 100;
+        const total = entries.reduce((sum, item) => sum + item.load, 0);
+        let used = 0;
+        els.floatingLoadStack.innerHTML = entries.map(({ event, load }) => {
+          const visible = Math.max(0, Math.min(load, capacity - used));
+          used += load;
+          return `<span class="load-stack-segment ${used > capacity ? 'load-stack-over' : ''}" style="width:${capacity ? Math.min(100, visible / capacity * 100) : 0}%" title="${escapeHtml(event.name)}：${load}%"></span>`;
+        }).join('') + (total < capacity ? `<span style="width:${capacity ? (capacity - total) / capacity * 100 : 100}%"></span>` : '');
+        els.floatingLoadSummary.classList.toggle('over', total > capacity);
+        els.floatingLoadSummary.textContent = `${date}｜已投入 ${total}% / 上限 ${capacity}%${total > capacity ? `｜超额 ${total - capacity}%` : `｜剩余 ${capacity - total}%`}`;
+        els.floatingLoadEventList.innerHTML = entries.length ? entries.map(({ event, assignment, load }) => `
+          <div class="daily-event-row" data-event-id="${event.id}" data-person-id="${person.id}">
+            <div><div class="daily-event-name">${escapeHtml(event.name)}｜${assignment.role === 'lead' ? '主责' : '参与'}</div><div class="daily-event-path">${escapeHtml(eventPath(event))}</div></div>
+            <input class="daily-load-input floating-daily-load-input" type="number" min="0" max="100" step="5" value="${load}">
+          </div>
+        `).join('') : '<div class="empty-records">该日没有安排此人参与的叶事件。</div>';
+        els.floatingLoadEventList.querySelectorAll('.floating-daily-load-input').forEach(input => input.addEventListener('change', () => saveFloatingDailyLoad(input)));
+      }
+
+      function saveFloatingDailyLoad(input) {
+        const row = input.closest('.daily-event-row');
+        const event = eventById(row.dataset.eventId);
+        const person = data.people.find(item => item.id === row.dataset.personId);
+        if (!event || !person) return;
+        const date = els.floatingLoadDateInput.value;
+        if (!event.dailyLoads) event.dailyLoads = {};
+        if (!event.dailyLoads[date]) event.dailyLoads[date] = {};
+        event.dailyLoads[date][person.id] = clampLoad(input.value, 0);
+        persist();
+        renderFloatingLoadPanel(person);
+        if (ui.selectedPersonId === person.id) renderDailyLoadBoard(person);
+        showToast(`已更新 ${person.name} 在 ${date} 的投入`);
+      }
+
+      function renderPeopleSidebar() {
+        const groups = [
+          { category: 'clientExecutive', label: '客户企业' },
+          { category: 'projectLeader', label: '项目领导' },
+          { category: 'projectMember', label: '项目组员' },
+          { category: 'other', label: '其他' }
+        ];
+        els.peopleSidebarList.innerHTML = groups.map(group => {
+          const people = data.people.filter(person => person.category === group.category);
+          return `
+            <section class="people-group" data-category="${group.category}">
+              <div class="people-group-header"><span>${group.label}</span><span class="people-group-count">${people.length}</span></div>
+              ${people.length ? people.map(person => `
+                <div class="people-sidebar-row" data-person-id="${person.id}">
+                  <button class="people-drag-handle" draggable="true" data-person-id="${person.id}" title="拖动排序或更换分组" aria-label="拖动 ${escapeHtml(person.name)}">⠿</button>
+                  <button class="people-sidebar-select ${person.id === ui.highlightedPersonId ? 'active' : ''}" data-person-id="${person.id}">
+                    <strong>${escapeHtml(person.name)}</strong>
+                    <small>${escapeHtml(personDisplayRole(person))}</small>
+                  </button>
+                  <button class="people-sidebar-edit" data-person-id="${person.id}" title="编辑人员" aria-label="编辑 ${escapeHtml(person.name)}">✎</button>
+                </div>
+              `).join('') : '<div class="people-group-empty">拖动人员到此分组</div>'}
+            </section>
+          `;
+        }).join('');
+        els.peopleSidebarList.querySelectorAll('.people-sidebar-select').forEach(button => {
+          button.addEventListener('click', () => {
+            const wasActive = ui.highlightedPersonId === button.dataset.personId;
+            setPersonHighlight(button.dataset.personId);
+            showToast(wasActive ? '已退出人员视角' : `已高亮 ${personName(button.dataset.personId)} 参与的事件`);
+          });
+        });
+        els.peopleSidebarList.querySelectorAll('.people-sidebar-edit').forEach(button => {
+          button.addEventListener('click', () => {
+            ui.selectedPersonId = button.dataset.personId;
+            renderPeopleBoard();
+            els.peopleBoardDialog.showModal();
+          });
+        });
+        bindPersonDragEvents();
+      }
+
+      function clearPersonDropIndicators() {
+        els.peopleSidebarList.querySelectorAll('.drop-target, .person-drop-before, .person-drop-after').forEach(element => {
+          element.classList.remove('drop-target', 'person-drop-before', 'person-drop-after');
+        });
+      }
+
+      function bindPersonDragEvents() {
+        els.peopleSidebarList.querySelectorAll('.people-drag-handle').forEach(handle => {
+          handle.addEventListener('click', event => event.stopPropagation());
+          handle.addEventListener('dragstart', event => {
+            ui.draggingPersonId = handle.dataset.personId;
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', handle.dataset.personId);
+            handle.closest('.people-sidebar-row').classList.add('dragging-person');
+          });
+          handle.addEventListener('dragend', () => {
+            ui.draggingPersonId = null;
+            clearPersonDropIndicators();
+          });
+        });
+        els.peopleSidebarList.querySelectorAll('.people-sidebar-row').forEach(row => {
+          row.addEventListener('dragover', event => {
+            if (!ui.draggingPersonId || ui.draggingPersonId === row.dataset.personId) return;
+            event.preventDefault();
+            clearPersonDropIndicators();
+            const rect = row.getBoundingClientRect();
+            row.classList.add(event.clientY < rect.top + rect.height / 2 ? 'person-drop-before' : 'person-drop-after');
+          });
+          row.addEventListener('drop', event => {
+            event.preventDefault();
+            movePerson(ui.draggingPersonId, row.dataset.personId, event.currentTarget.classList.contains('person-drop-after'));
+          });
+        });
+        els.peopleSidebarList.querySelectorAll('.people-group').forEach(group => {
+          group.addEventListener('dragover', event => {
+            if (!ui.draggingPersonId || event.target.closest('.people-sidebar-row')) return;
+            event.preventDefault();
+            clearPersonDropIndicators();
+            group.classList.add('drop-target');
+          });
+          group.addEventListener('drop', event => {
+            if (event.target.closest('.people-sidebar-row')) return;
+            event.preventDefault();
+            movePersonToGroup(ui.draggingPersonId, group.dataset.category);
+          });
+        });
+      }
+
+      function canMovePersonToCategory(person, category) {
+        const hasWorkAssignments = data.events.some(event => (event.assignments || []).some(item => item.personId === person.id));
+        const hasReportLinks = data.events.some(event => (event.reportTo || []).includes(person.id) || (event.attendeeIds || []).includes(person.id));
+        if (category !== 'projectMember' && hasWorkAssignments) {
+          showToast('该人员仍有主责或参与事项，不能移出项目组员');
+          return false;
+        }
+        if (category === 'projectMember' && hasReportLinks) {
+          showToast('该人员仍是汇报对象或参会人员，不能移入项目组员');
+          return false;
+        }
+        return true;
+      }
+
+      function movePerson(movingId, targetId, placeAfter) {
+        const moving = data.people.find(person => person.id === movingId);
+        const target = data.people.find(person => person.id === targetId);
+        if (!moving || !target || moving === target || !canMovePersonToCategory(moving, target.category)) return;
+        data.people.splice(data.people.indexOf(moving), 1);
+        moving.category = target.category;
+        const targetIndex = data.people.indexOf(target);
+        data.people.splice(targetIndex + (placeAfter ? 1 : 0), 0, moving);
+        persist();
+        renderPeopleSidebar();
+        showToast('人员顺序已更新');
+      }
+
+      function movePersonToGroup(personId, category) {
+        const person = data.people.find(item => item.id === personId);
+        if (!person || !canMovePersonToCategory(person, category)) return;
+        data.people.splice(data.people.indexOf(person), 1);
+        person.category = category;
+        const lastIndex = data.people.reduce((index, item, current) => item.category === category ? current : index, -1);
+        data.people.splice(lastIndex + 1, 0, person);
+        persist();
+        renderPeopleSidebar();
+        showToast(`已移动到“${personCategoryLabel(category)}”分组`);
+      }
+
+      function renderPeopleBoard() {
+        if (!data.people.some(person => person.id === ui.selectedPersonId)) {
+          ui.selectedPersonId = data.people[0]?.id || null;
+        }
+
+        els.peopleBoardList.innerHTML = data.people.length ? data.people.map(person => `
+          <div class="person-list-row">
+            <button class="person-select-button ${person.id === ui.selectedPersonId ? 'selected' : ''}" data-person-id="${person.id}" title="在甘特图中高亮">
+              <span class="person-select-name">${escapeHtml(person.name)}</span>
+              <span class="person-select-category">${escapeHtml(personDisplayRole(person))}｜${personCategoryLabel(person.category)}</span>
+            </button>
+            <button class="person-edit-button" data-person-id="${person.id}" title="编辑人员" aria-label="编辑 ${escapeHtml(person.name)}">✎</button>
+          </div>
+        `).join('') : '<div class="empty-records">还没有人员</div>';
+
+        els.peopleBoardList.querySelectorAll('.person-select-button').forEach(button => {
+          button.addEventListener('click', () => {
+            ui.selectedPersonId = button.dataset.personId;
+            const wasActive = ui.highlightedPersonId === button.dataset.personId;
+            setPersonHighlight(button.dataset.personId);
+            els.peopleBoardDialog.close();
+            showToast(wasActive ? '已退出人员视角' : `已高亮 ${personName(button.dataset.personId)} 参与的事件`);
+          });
+        });
+        els.peopleBoardList.querySelectorAll('.person-edit-button').forEach(button => {
+          button.addEventListener('click', () => {
+            ui.selectedPersonId = button.dataset.personId;
+            renderPeopleBoard();
+          });
+        });
+
+        const person = selectedPerson();
+        els.personEditorEmpty.hidden = Boolean(person);
+        els.personEditorFields.hidden = !person;
+        if (!person) {
+          els.participationHeading.textContent = '参与事件';
+          els.participationSummary.innerHTML = '';
+          els.participationList.innerHTML = '<div class="empty-records">新增或选择人员后查看</div>';
+          return;
+        }
+
+        els.personNameInput.value = person.name;
+        els.personCategoryInput.value = person.category || 'other';
+        els.personRoleInput.value = person.title || '';
+        els.personCapacityInput.value = person.dailyCapacity ?? 100;
+        const currentProjectRange = projectDateRange();
+        els.personAvailableFromInput.value = person.startBoundary === 'project' ? currentProjectRange.start : person.availableFrom || '';
+        els.personAvailableToInput.value = person.endBoundary === 'project' ? currentProjectRange.end : person.availableTo || '';
+        els.personNotesInput.value = person.notes || '';
+        ui.personStartBoundary = person.startBoundary === 'project' ? 'project' : 'date';
+        ui.personEndBoundary = person.endBoundary === 'project' ? 'project' : 'date';
+        setPersonParticipationMode(person.participationMode || (person.availableFrom || person.availableTo ? 'custom' : 'full'));
+        updatePersonDateRangeButton();
+        const participations = personParticipations(person.id);
+        const leadCount = participations.filter(item => item.assignment.role === 'lead').length;
+        const assistCount = participations.filter(item => item.assignment.role === 'assist').length;
+        const keyParticipantCount = participations.filter(item => item.assignment.role === 'report' || item.assignment.role === 'attend').length;
+        els.participationHeading.textContent = `${person.name}的参与事件`;
+        els.participationSummary.innerHTML = `
+          <span class="summary-chip">共 ${participations.length} 个事件</span>
+          <span class="summary-chip">主责 ${leadCount}</span>
+          <span class="summary-chip">参与 ${assistCount}</span>
+          <span class="summary-chip">关键参与 ${keyParticipantCount}</span>
+          ${ui.highlightedPersonId === person.id ? '<span class="summary-chip highlight-note">甘特图已高亮</span>' : ''}
+        `;
+        renderDailyLoadBoard(person);
+        const availabilityCard = `
+          <article class="participation-card" style="background:var(--surface-soft)">
+            <div class="participation-title">参与日期</div>
+            <div class="participation-meta">
+              <span>${person.participationMode === 'custom' ? `${person.startBoundary === 'project' ? `从项目开始（${currentProjectRange.start}）` : person.availableFrom || '未设开始日期'} 至 ${person.endBoundary === 'project' ? `项目结束（${currentProjectRange.end}）` : person.availableTo || '未设结束日期'}` : '全程参与'}</span>
+            </div>
+            ${person.notes ? `<div class="participation-path" style="margin-top:8px;white-space:pre-wrap">${escapeHtml(person.notes)}</div>` : ''}
+          </article>
+        `;
+        els.participationList.innerHTML = availabilityCard + (participations.length ? participations.map(({ event, assignment, range }) => `
+          <article class="participation-card">
+            <div class="participation-title">${escapeHtml(event.name)}</div>
+            <div class="participation-path">${escapeHtml(eventPath(event))}</div>
+            <div class="participation-meta">
+              <span class="role-badge">${assignment.role === 'lead' ? '主负责人' : assignment.role === 'assist' ? '参与组员' : '关键参与人员'}</span>
+              ${assignment.role === 'lead' || assignment.role === 'assist' ? '<span>投入按具体日期设置</span>' : ''}
+              <span>${range.start} 至 ${range.end}</span>
+              <span>${workdayCount(range.start, range.end)} 个工作日</span>
+            </div>
+          </article>
+        `).join('') : '<div class="empty-records">暂未参与任何事件。项目组员可设为主负责人或参与组员，其他角色可设为关键参与人员。</div>');
+      }
+
+      function renderDailyLoadBoard(person) {
+        const isMember = person?.category === 'projectMember';
+        els.dailyLoadBoard.hidden = !isMember;
+        if (!isMember) return;
+        const range = personParticipationRange(person);
+        if (!els.dailyLoadDateInput.value || els.dailyLoadDateInput.value < range.start || els.dailyLoadDateInput.value > range.end) {
+          els.dailyLoadDateInput.value = range.start;
+        }
+        els.dailyLoadDateInput.min = range.start;
+        els.dailyLoadDateInput.max = range.end;
+        const date = els.dailyLoadDateInput.value;
+        const entries = data.events.flatMap(event => {
+          if (childrenOf(event.id).length) return [];
+          const assignment = (event.assignments || []).find(item => item.personId === person.id);
+          if (!assignment) return [];
+          const eventRange = effectiveRange(event);
+          if (date < eventRange.start || date > eventRange.end) return [];
+          return [{ event, assignment, load: assignmentLoadForDate(event, assignment, date) }];
+        });
+        const capacity = person.dailyCapacity ?? 100;
+        const total = entries.reduce((sum, item) => sum + item.load, 0);
+        let used = 0;
+        els.dailyLoadStack.innerHTML = entries.map(({ event, load }) => {
+          const visible = Math.max(0, Math.min(load, capacity - used));
+          used += load;
+          return `<span class="load-stack-segment ${used > capacity ? 'load-stack-over' : ''}" style="width:${capacity ? Math.min(100, visible / capacity * 100) : 0}%" title="${escapeHtml(event.name)}：${load}%"></span>`;
+        }).join('') + (total < capacity ? `<span style="width:${capacity ? (capacity - total) / capacity * 100 : 100}%"></span>` : '');
+        els.dailyLoadSummary.classList.toggle('over', total > capacity);
+        els.dailyLoadSummary.textContent = `${date}｜已投入 ${total}% / 上限 ${capacity}%${total > capacity ? `｜超额 ${total - capacity}%` : `｜剩余 ${capacity - total}%`}`;
+        els.dailyLoadEventList.innerHTML = entries.length ? entries.map(({ event, assignment, load }) => `
+          <div class="daily-event-row" data-event-id="${event.id}" data-person-id="${person.id}">
+            <div><div class="daily-event-name">${escapeHtml(event.name)}｜${assignment.role === 'lead' ? '主责' : '参与'}</div><div class="daily-event-path">${escapeHtml(eventPath(event))}</div></div>
+            <input class="daily-load-input" type="number" min="0" max="100" step="5" value="${load}" aria-label="${escapeHtml(event.name)}在${date}的投入百分比">
+          </div>
+        `).join('') : '<div class="empty-records">该日没有安排此人参与的事件。</div>';
+        els.dailyLoadEventList.querySelectorAll('.daily-load-input').forEach(input => {
+          input.addEventListener('change', () => saveDailyLoad(input));
+        });
+      }
+
+      function saveDailyLoad(input) {
+        const row = input.closest('.daily-event-row');
+        const event = eventById(row.dataset.eventId);
+        const person = data.people.find(item => item.id === row.dataset.personId);
+        if (!event || !person) return;
+        const date = els.dailyLoadDateInput.value;
+        const load = clampLoad(input.value, 0);
+        if (!event.dailyLoads) event.dailyLoads = {};
+        if (!event.dailyLoads[date]) event.dailyLoads[date] = {};
+        event.dailyLoads[date][person.id] = load;
+        persist();
+        renderDailyLoadBoard(person);
+        showToast(`已更新 ${person.name} 在 ${date} 的投入`);
+      }
+
+      function addPerson() {
+        const person = {
+          id: `person-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+          name: '新人员',
+          category: 'projectMember',
+          title: '',
+          availableFrom: '',
+          availableTo: '',
+          participationMode: 'full',
+          startBoundary: 'date',
+          endBoundary: 'date',
+          notes: '',
+          dailyCapacity: 100
+        };
+        data.people.push(person);
+        ui.selectedPersonId = person.id;
+        persist();
+        renderPeopleBoard();
+        renderPeopleSidebar();
+        els.personNameInput.focus();
+        els.personNameInput.select();
+      }
+
+      function savePerson() {
+        const person = selectedPerson();
+        if (!person) return;
+        const name = els.personNameInput.value.trim();
+        if (!name) return showToast('请填写姓名或角色名称');
+        const nextCategory = els.personCategoryInput.value;
+        const participationMode = document.querySelector('input[name="personParticipationMode"]:checked')?.value || 'full';
+        const availableFrom = participationMode === 'custom' ? els.personAvailableFromInput.value : '';
+        const availableTo = participationMode === 'custom' ? els.personAvailableToInput.value : '';
+        if (participationMode === 'custom' && (!availableFrom || !availableTo)) return showToast('请完整选择参与开始与结束日期');
+        if (availableTo < availableFrom) return showToast('参与结束日期不能早于开始日期');
+        const projectRange = projectDateRange();
+        const proposedRange = participationMode === 'full' ? projectRange : {
+          start: ui.personStartBoundary === 'project' ? projectRange.start : availableFrom,
+          end: ui.personEndBoundary === 'project' ? projectRange.end : availableTo
+        };
+        const invalidEvent = data.events.find(event => {
+          const involved = (event.assignments || []).some(item => item.personId === person.id)
+            || (event.reportTo || []).includes(person.id)
+            || (event.attendeeIds || []).includes(person.id);
+          if (!involved) return false;
+          const range = effectiveRange(event);
+          return range.start < proposedRange.start || range.end > proposedRange.end;
+        });
+        if (invalidEvent) return showToast(`无法保存：“${invalidEvent.name}”超出新的参与日期，请先调整事件或移除该人员`);
+        const hasWorkAssignments = data.events.some(event => (event.assignments || []).some(item => item.personId === person.id));
+        const hasReportLinks = data.events.some(event => (event.reportTo || []).includes(person.id) || (event.attendeeIds || []).includes(person.id));
+        if (nextCategory !== 'projectMember' && hasWorkAssignments) {
+          return showToast('该人员仍有主责或参与事项，请先移除后再修改属性');
+        }
+        if (nextCategory === 'projectMember' && hasReportLinks) {
+          return showToast('该人员仍是重要节点汇报对象，请先移除后再改为项目组员');
+        }
+        person.name = name;
+        person.category = nextCategory;
+        person.title = els.personRoleInput.value.trim();
+        person.dailyCapacity = clampLoad(els.personCapacityInput.value, 100);
+        person.availableFrom = availableFrom;
+        person.availableTo = availableTo;
+        person.participationMode = participationMode;
+        person.startBoundary = participationMode === 'custom' ? ui.personStartBoundary : 'date';
+        person.endBoundary = participationMode === 'custom' ? ui.personEndBoundary : 'date';
+        person.notes = els.personNotesInput.value.trim();
+        persist();
+        render();
+        renderPeopleBoard();
+        renderPeopleSidebar();
+        showToast('人员信息已保存');
+      }
+
+      function deletePerson() {
+        const person = selectedPerson();
+        if (!person) return;
+        const count = personParticipations(person.id).length;
+        if (count) return showToast(`该人员仍参与 ${count} 个事件，请先移除参与关系`);
+        if (!window.confirm(`确定删除“${person.name}”吗？`)) return;
+        data.people = data.people.filter(item => item.id !== person.id);
+        if (ui.highlightedPersonId === person.id) {
+          ui.highlightedPersonId = null;
+        }
+        ui.selectedPersonId = data.people[0]?.id || null;
+        persist();
+        renderPeopleBoard();
+        renderPeopleSidebar();
+        showToast('人员已删除');
+      }
+
+      function loadHistory() {
+        try {
+          const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+          return Array.isArray(history) ? history : [];
+        } catch (error) {
+          console.warn('历史记录无法读取。', error);
+          return [];
+        }
+      }
+
+      function saveSnapshot(label = '手动保存') {
+        const history = loadHistory();
+        history.unshift({
+          id: `version-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+          savedAt: new Date().toISOString(),
+          label,
+          data: clone(data)
+        });
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 30)));
+      }
+
+      function formatSavedAt(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '时间未知';
+        return new Intl.DateTimeFormat('zh-CN', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }).format(date);
+      }
+
+      function renderHistory() {
+        const history = loadHistory();
+        els.historyList.innerHTML = history.length ? history.map(item => `
+          <div class="record-row">
+            <div class="record-main">
+              <div class="record-title">${escapeHtml(item.label || '保存版本')}</div>
+              <div class="record-meta">${escapeHtml(formatSavedAt(item.savedAt))}｜${item.data?.events?.length || 0} 个事件</div>
+            </div>
+            <div class="record-actions"><button class="record-action restore-version" data-version-id="${escapeHtml(item.id)}">回滚到此版本</button></div>
+          </div>
+        `).join('') : '<div class="empty-records">还没有历史记录。点击工具栏中的“保存版本”即可创建。</div>';
+
+        els.historyList.querySelectorAll('.restore-version').forEach(button => {
+          button.addEventListener('click', () => restoreSnapshot(button.dataset.versionId));
+        });
+      }
+
+      function restoreSnapshot(id) {
+        const snapshot = loadHistory().find(item => item.id === id);
+        if (!snapshot?.data) return showToast('未找到该历史版本');
+        if (!window.confirm(`确定回滚到 ${formatSavedAt(snapshot.savedAt)} 的版本吗？`)) return;
+        saveSnapshot('回滚前自动备份');
+        data = normalizeDataShape(clone(snapshot.data));
+        ui.collapsed.clear();
+        persist();
+        render();
+        renderPeopleSidebar();
+        renderHistory();
+        showToast('已回滚，并保留回滚前备份');
+      }
+
+      function clearPeopleAndEnergy() {
+        const affected = data.events.filter(event => (event.assignments || []).length || (event.reportTo || []).length || (event.attendeeIds || []).length || Object.keys(event.dailyLoads || {}).length).length;
+        if (!affected) return showToast('当前没有需要清除的人员关联或精力记录');
+        if (!window.confirm(`确定清除 ${affected} 个事件中的全部人员关联与按日投入吗？\n\n人员名单、事件结构和日期会保留，操作前会自动保存历史版本。`)) return;
+        saveSnapshot('清除人员与精力前自动备份');
+        data.events.forEach(event => {
+          event.assignments = [];
+          event.reportTo = [];
+          event.attendeeIds = [];
+          event.dailyLoads = {};
+        });
+        ui.highlightedPersonId = null;
+        persist();
+        render();
+        renderPeopleSidebar();
+        els.batchClearDialog.close();
+        showToast('已清除全部人员关联与精力，可从历史记录回滚');
+      }
+
+      function clearEventKinds() {
+        const affected = data.events.filter(event => event.kind !== 'regular').length;
+        if (!affected) return showToast('所有事件目前均为常规事件');
+        if (!window.confirm(`确定将 ${affected} 个内部或外部重要节点恢复为常规事件吗？\n\n事件、人员关联和日期会保留，操作前会自动保存历史版本。`)) return;
+        saveSnapshot('清除事件性质前自动备份');
+        data.events.forEach(event => { event.kind = 'regular'; });
+        ui.kindFilter = null;
+        persist();
+        render();
+        els.batchClearDialog.close();
+        showToast('已将全部事件性质恢复为常规事件，可从历史记录回滚');
+      }
+
+      function renderOvertimeDates() {
+        const dates = [...new Set(data.workdayOverrides || [])].sort();
+        els.overtimeDateList.innerHTML = dates.length ? dates.map(date => `
+          <div class="record-row">
+            <div class="record-main">
+              <div class="record-title">${formatDate(date)}（周${weekdayLabel(date)}）</div>
+              <div class="record-meta">${date}｜人为设定为工作日</div>
+            </div>
+            <div class="record-actions"><button class="record-action remove-overtime-date" data-date="${date}">移除</button></div>
+          </div>
+        `).join('') : '<div class="empty-records">尚未设置额外的周末加班工作日。</div>';
+
+        els.overtimeDateList.querySelectorAll('.remove-overtime-date').forEach(button => {
+          button.addEventListener('click', () => {
+            data.workdayOverrides = (data.workdayOverrides || []).filter(date => date !== button.dataset.date);
+            persist();
+            render();
+            renderOvertimeDates();
+            showToast('已恢复为非工作日');
+          });
+        });
+      }
+
+      function addOvertimeDate() {
+        const date = els.overtimeDate.value;
+        if (!date) return showToast('请先选择日期');
+        if (!isWeekend(date)) return showToast('只能将周六或周日设为加班工作日');
+        if (ADJUSTED_WORKDAYS.has(date)) return showToast('该日期已是法定调休工作日');
+        data.workdayOverrides = [...new Set([...(data.workdayOverrides || []), date])].sort();
+        persist();
+        render();
+        renderOvertimeDates();
+        els.overtimeDate.value = '';
+        showToast('已设为加班工作日');
+      }
+
+      function showToast(message) {
+        els.toast.textContent = message;
+        els.toast.classList.add('show');
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(() => els.toast.classList.remove('show'), 1800);
+      }
+
+      els.addRootButton.addEventListener('click', () => createEvent(null));
+      els.saveVersionButton.addEventListener('click', () => {
+        persist();
+        saveSnapshot('手动保存');
+        showToast('当前版本已保存到历史记录');
+      });
+      els.historyButton.addEventListener('click', () => {
+        renderHistory();
+        els.historyDialog.showModal();
+      });
+      els.batchClearButton.addEventListener('click', () => els.batchClearDialog.showModal());
+      els.clearPeopleEnergyButton.addEventListener('click', clearPeopleAndEnergy);
+      els.clearEventKindsButton.addEventListener('click', clearEventKinds);
+      els.workdaySettingsButton.addEventListener('click', () => {
+        renderOvertimeDates();
+        els.workdayDialog.showModal();
+      });
+      els.sidebarAddPersonButton.addEventListener('click', () => {
+        addPerson();
+        els.peopleBoardDialog.showModal();
+      });
+      els.sidebarManagePeopleButton.addEventListener('click', () => {
+        renderPeopleBoard();
+        els.peopleBoardDialog.showModal();
+      });
+      els.addPersonButton.addEventListener('click', addPerson);
+      els.savePersonButton.addEventListener('click', savePerson);
+      els.deletePersonButton.addEventListener('click', deletePerson);
+      els.addOvertimeDateButton.addEventListener('click', addOvertimeDate);
+      els.dateRangeButton.addEventListener('click', () => openDateRangePicker('event'));
+      els.personDateRangeButton.addEventListener('click', () => openDateRangePicker('person'));
+      els.dailyLoadDateInput.addEventListener('change', () => {
+        const person = selectedPerson();
+        if (person) renderDailyLoadBoard(person);
+      });
+      els.floatingLoadDateInput.addEventListener('change', () => {
+        const person = data.people.find(item => item.id === ui.highlightedPersonId);
+        if (person) renderFloatingLoadPanel(person);
+      });
+      els.floatingLoadCloseButton.addEventListener('click', clearPersonHighlight);
+      els.floatingLoadHeader.addEventListener('pointerdown', event => {
+        if (event.target.closest('button')) return;
+        const rect = els.floatingLoadPanel.getBoundingClientRect();
+        const offsetX = event.clientX - rect.left;
+        const offsetY = event.clientY - rect.top;
+        const move = moveEvent => {
+          const left = Math.max(6, Math.min(window.innerWidth - rect.width - 6, moveEvent.clientX - offsetX));
+          const top = Math.max(6, Math.min(window.innerHeight - 80, moveEvent.clientY - offsetY));
+          els.floatingLoadPanel.style.left = `${left}px`;
+          els.floatingLoadPanel.style.top = `${top}px`;
+          els.floatingLoadPanel.style.right = 'auto';
+        };
+        const end = () => window.removeEventListener('pointermove', move);
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', end, { once: true });
+      });
+      document.querySelectorAll('input[name="personParticipationMode"]').forEach(radio => {
+        radio.addEventListener('change', () => setPersonParticipationMode(radio.value));
+      });
+      els.previousMonthButton.addEventListener('click', () => changeCalendarMonth(-1));
+      els.nextMonthButton.addEventListener('click', () => changeCalendarMonth(1));
+      els.useProjectStartButton.addEventListener('click', useProjectStartBoundary);
+      els.useProjectEndButton.addEventListener('click', useProjectEndBoundary);
+      document.querySelectorAll('[data-close-dialog]').forEach(button => {
+        button.addEventListener('click', () => document.getElementById(button.dataset.closeDialog)?.close());
+      });
+      els.expandAllButton.addEventListener('click', () => { ui.collapsed.clear(); render(); });
+      els.collapseAllButton.addEventListener('click', () => {
+        ui.collapsed = new Set(data.events.filter(event => childrenOf(event.id).length).map(event => event.id));
+        render();
+      });
+      els.zoomOutButton.addEventListener('click', () => stepZoom(-1));
+      els.zoomInButton.addEventListener('click', () => stepZoom(1));
+      els.zoomOverviewButton.addEventListener('click', () => applyZoomMode('overview'));
+      els.zoomWeekButton.addEventListener('click', () => applyZoomMode('week'));
+      document.querySelectorAll('.legend-filter').forEach(button => {
+        button.addEventListener('click', () => toggleKindFilter(button.dataset.kindFilter));
+      });
+      els.drawerBackdrop.addEventListener('click', closeEditor);
+      els.closeDrawerButton.addEventListener('click', closeEditor);
+      els.saveEventButton.addEventListener('click', saveEditor);
+      els.deleteEventButton.addEventListener('click', deleteCurrentEvent);
+      els.addChildButton.addEventListener('click', () => {
+        const parentId = ui.draftId;
+        closeEditor();
+        createEvent(parentId);
+      });
+      els.leadPerson.addEventListener('change', () => {
+        const event = eventById(ui.draftId);
+        if (!event) return;
+        const draft = clone(event);
+        const assistants = (draft.assignments || []).filter(item => item.role === 'assist');
+        draft.assignments = assistants;
+        if (els.leadPerson.value) draft.assignments.push({ personId: els.leadPerson.value, role: 'lead' });
+        renderAssistantOptions(draft);
+      });
+      els.eventStart.addEventListener('change', updateDateWarning);
+      els.eventEnd.addEventListener('change', updateDateWarning);
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && els.editorDrawer.classList.contains('open')) closeEditor();
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && els.editorDrawer.classList.contains('open')) saveEditor();
+      });
+      let resizeTimer;
+      window.addEventListener('resize', () => {
+        if (ui.zoomMode !== 'overview' && ui.zoomMode !== 'week') return;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(render, 120);
+      });
+
+      renderPeopleSidebar();
+      render();
+      loadSharedProject();
+    })();
+  </script>
+</body>
+</html>
