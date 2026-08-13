@@ -34,7 +34,11 @@
     body {
       margin: 0;
       min-width: 960px;
-      min-height: 100vh;
+      height: 100vh;
+      min-height: 640px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       background: var(--bg);
     }
 
@@ -95,20 +99,25 @@
 
     .toolbar {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
+      flex-wrap: wrap;
       gap: 16px;
       padding: 10px 24px;
       background: var(--surface);
       border-bottom: 1px solid var(--line);
     }
 
-    .toolbar-group { display: flex; align-items: center; gap: 8px; }
+    .toolbar-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .toolbar-group:first-child { flex: 1 1 920px; }
+    .toolbar-group:last-child { flex: 1 1 720px; justify-content: flex-end; }
 
     .toolbar button {
+      flex: 0 0 auto;
       height: 32px;
       padding: 0 11px;
       font-size: 13px;
+      white-space: nowrap;
     }
 
     .toolbar .primary {
@@ -127,6 +136,36 @@
       border-color: var(--blue);
       color: var(--blue);
     }
+
+    .toolbar-more { position: relative; flex: 0 0 auto; }
+    .toolbar-more > summary {
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: var(--surface);
+      font-size: 13px;
+      white-space: nowrap;
+      cursor: pointer;
+      list-style: none;
+    }
+    .toolbar-more > summary::-webkit-details-marker { display: none; }
+    .toolbar-more[open] > summary { border-color: #9ea8b2; background: #fafafa; }
+    .toolbar-more-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 45;
+      width: 180px;
+      padding: 7px;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      background: var(--surface);
+      box-shadow: 0 12px 30px rgba(20, 28, 35, .18);
+    }
+    .toolbar-more-menu button { width: 100%; margin: 2px 0; text-align: left; }
 
     .people-view-dropdown { position: relative; }
     .people-view-menu {
@@ -168,8 +207,9 @@
     }
 
     .workspace {
-      height: calc(100vh - 159px);
-      min-height: 480px;
+      flex: 1 1 auto;
+      height: auto;
+      min-height: 0;
       padding: 16px 24px 20px;
       display: flex;
       align-items: stretch;
@@ -1025,12 +1065,20 @@
     <div class="toolbar-group">
       <button class="primary" id="addRootButton">＋ 新增一级事件</button>
       <button class="secondary-accent" id="saveVersionButton">保存版本</button>
-      <button class="secondary-accent" id="syncSharedButton" hidden>同步到共享版</button>
       <button id="historyButton">历史记录</button>
-      <button id="batchClearButton">批量清除</button>
       <button id="workdaySettingsButton">加班工作日</button>
       <button id="expandAllButton">全部展开</button>
       <button id="collapseAllButton">全部折叠</button>
+      <details class="toolbar-more" id="toolbarMore">
+        <summary>更多 ▾</summary>
+        <div class="toolbar-more-menu">
+          <button id="batchClearButton">批量清除</button>
+          <button id="exportProjectButton">导出项目数据</button>
+          <button id="importProjectButton">导入并同步数据</button>
+          <button class="secondary-accent" id="syncSharedButton" hidden>直接同步到共享版</button>
+          <input id="importProjectInput" type="file" accept="application/json,.json" hidden>
+        </div>
+      </details>
       <div class="zoom-controls" aria-label="时间轴缩放">
         <button id="zoomOutButton" title="缩小时间轴">－</button>
         <span class="zoom-label" id="zoomLabel">标准</span>
@@ -1398,6 +1446,10 @@
         addRootButton: document.getElementById('addRootButton'),
         saveVersionButton: document.getElementById('saveVersionButton'),
         syncSharedButton: document.getElementById('syncSharedButton'),
+        exportProjectButton: document.getElementById('exportProjectButton'),
+        importProjectButton: document.getElementById('importProjectButton'),
+        importProjectInput: document.getElementById('importProjectInput'),
+        toolbarMore: document.getElementById('toolbarMore'),
         historyButton: document.getElementById('historyButton'),
         batchClearButton: document.getElementById('batchClearButton'),
         workdaySettingsButton: document.getElementById('workdaySettingsButton'),
@@ -1601,6 +1653,63 @@
         } finally {
           els.syncSharedButton.disabled = false;
           els.syncSharedButton.textContent = '同步到共享版';
+        }
+      }
+
+      function exportProjectData() {
+        let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+          if (!Array.isArray(history)) history = [];
+        } catch (error) {
+          history = [];
+        }
+        const payload = {
+          format: 'project-gantt-backup',
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          data: clone(data),
+          history
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `项目管理甘特图_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        els.toolbarMore.open = false;
+        showToast('项目数据已导出');
+      }
+
+      async function importProjectData(file) {
+        if (!file) return;
+        try {
+          const payload = JSON.parse(await file.text());
+          const imported = payload?.data || payload;
+          if (!Array.isArray(imported?.people) || !Array.isArray(imported?.events)) throw new Error('invalid data');
+          if (!window.confirm(`将导入 ${imported.events.length} 个事件和 ${imported.people.length} 名人员，并覆盖当前共享数据。是否继续？`)) return;
+          data = normalizeDataShape(clone(imported));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          if (Array.isArray(payload.history)) localStorage.setItem(HISTORY_KEY, JSON.stringify(payload.history));
+          const response = await fetch(SHARED_API_URL, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ data })
+          });
+          if (!response.ok) throw new Error('shared save failed');
+          ui.collapsed.clear();
+          renderPeopleSidebar();
+          render();
+          els.saveState.textContent = '导入并同步成功';
+          els.toolbarMore.open = false;
+          showToast('完整数据已导入共享版');
+        } catch (error) {
+          showToast('导入失败：请确认文件正确且代理已开启');
+        } finally {
+          els.importProjectInput.value = '';
         }
       }
 
@@ -3287,6 +3396,9 @@
       });
       els.syncSharedButton.hidden = location.protocol !== 'file:';
       els.syncSharedButton.addEventListener('click', syncLocalProjectToShared);
+      els.exportProjectButton.addEventListener('click', exportProjectData);
+      els.importProjectButton.addEventListener('click', () => els.importProjectInput.click());
+      els.importProjectInput.addEventListener('change', () => importProjectData(els.importProjectInput.files?.[0]));
       els.historyButton.addEventListener('click', () => {
         renderHistory();
         els.historyDialog.showModal();
