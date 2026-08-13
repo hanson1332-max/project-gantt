@@ -1025,6 +1025,7 @@
     <div class="toolbar-group">
       <button class="primary" id="addRootButton">＋ 新增一级事件</button>
       <button class="secondary-accent" id="saveVersionButton">保存版本</button>
+      <button class="secondary-accent" id="syncSharedButton" hidden>同步到共享版</button>
       <button id="historyButton">历史记录</button>
       <button id="batchClearButton">批量清除</button>
       <button id="workdaySettingsButton">加班工作日</button>
@@ -1322,6 +1323,7 @@
 
       const STORAGE_KEY = 'project-gantt-mvp-v0.1-minimal';
       const HISTORY_KEY = 'project-gantt-mvp-v0.1-history';
+      const SHARED_API_URL = 'https://qingmei-project-gantt.hanson1332.chatgpt.site/api/project';
       let DAY_WIDTH = 34;
       const ZOOM_MODES = ['overview', 'compact', 'normal', 'detail', 'week'];
       const TODAY = '2026-08-13';
@@ -1395,6 +1397,7 @@
         saveState: document.getElementById('saveState'),
         addRootButton: document.getElementById('addRootButton'),
         saveVersionButton: document.getElementById('saveVersionButton'),
+        syncSharedButton: document.getElementById('syncSharedButton'),
         historyButton: document.getElementById('historyButton'),
         batchClearButton: document.getElementById('batchClearButton'),
         workdaySettingsButton: document.getElementById('workdaySettingsButton'),
@@ -1550,7 +1553,7 @@
         }));
         if (location.protocol === 'http:' || location.protocol === 'https:') {
           clearTimeout(persist.sharedTimer);
-          persist.sharedTimer = setTimeout(() => fetch('https://qingmei-project-gantt.hanson1332.chatgpt.site/api/project', {
+          persist.sharedTimer = setTimeout(() => fetch(SHARED_API_URL, {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ data })
@@ -1566,7 +1569,7 @@
       async function loadSharedProject() {
         if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
         try {
-          const response = await fetch('https://qingmei-project-gantt.hanson1332.chatgpt.site/api/project');
+          const response = await fetch(SHARED_API_URL);
           if (!response.ok) return;
           const payload = await response.json();
           if (!payload?.data) return;
@@ -1577,6 +1580,27 @@
           els.saveState.innerHTML = '共享数据已载入';
         } catch (error) {
           console.warn('共享数据暂时无法载入。', error);
+        }
+      }
+
+      async function syncLocalProjectToShared() {
+        if (!window.confirm('将以当前本地项目覆盖共享版数据。共享版现有数据仍可通过历史记录或本地版本找回。是否继续？')) return;
+        els.syncSharedButton.disabled = true;
+        els.syncSharedButton.textContent = '正在同步…';
+        try {
+          const response = await fetch(SHARED_API_URL, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ data })
+          });
+          if (!response.ok) throw new Error('同步失败');
+          els.saveState.textContent = '已同步到共享版';
+          showToast('完整项目数据已同步到共享版');
+        } catch (error) {
+          showToast('同步失败，请确认代理已开启后重试');
+        } finally {
+          els.syncSharedButton.disabled = false;
+          els.syncSharedButton.textContent = '同步到共享版';
         }
       }
 
@@ -3261,6 +3285,8 @@
         saveSnapshot('手动保存');
         showToast('当前版本已保存到历史记录');
       });
+      els.syncSharedButton.hidden = location.protocol !== 'file:';
+      els.syncSharedButton.addEventListener('click', syncLocalProjectToShared);
       els.historyButton.addEventListener('click', () => {
         renderHistory();
         els.historyDialog.showModal();
