@@ -1374,7 +1374,8 @@
       const SHARED_API_URL = 'https://qingmei-project-gantt.hanson1332.chatgpt.site/api/project';
       let DAY_WIDTH = 34;
       const ZOOM_MODES = ['overview', 'compact', 'normal', 'detail', 'week'];
-      const TODAY = '2026-08-13';
+      const now = new Date();
+      const TODAY = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       // 国办发明电〔2025〕7号：2026 年法定节假日与调休上班日。
       const HOLIDAY_NAMES = new Map([
         ['2026-01-01', '元旦'], ['2026-01-02', '元旦'], ['2026-01-03', '元旦'],
@@ -2837,9 +2838,7 @@
         els.floatingLoadPanel.hidden = false;
         els.floatingLoadTitle.textContent = `${person.name}｜每日精力分配`;
         const range = personParticipationRange(person);
-        if (!els.floatingLoadDateInput.value || els.floatingLoadDateInput.value < range.start || els.floatingLoadDateInput.value > range.end) {
-          els.floatingLoadDateInput.value = range.start;
-        }
+        els.floatingLoadDateInput.value = TODAY < range.start ? range.start : TODAY > range.end ? range.end : TODAY;
         els.floatingLoadDateInput.min = range.start;
         els.floatingLoadDateInput.max = range.end;
         renderFloatingLoadPanel(person);
